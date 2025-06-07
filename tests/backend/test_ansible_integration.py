@@ -62,7 +62,7 @@ def test_both_access_methods_supported():
     
     # Check that both access methods are supported
     backend_api_port = any('8000:8000' in port for port in port_strings)
-    ui_port = any('8080:8000' in port for port in port_strings)
+    ui_port = any('8080:8080' in port for port in port_strings)
     
     assert backend_api_port, "Backend API access on port 8000 must be available for Ansible"
     assert ui_port, "Frontend UI access on port 8080 must be available for users"
