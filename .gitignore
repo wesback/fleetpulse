@@ -1,0 +1,88 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+*.env
+.venv/
+env/
+venv/
+instance/
+# SQLite database (if stored locally)
+*.sqlite3
+*.db
+db/
+data/
+.mypy_cache/
+.pytest_cache/
+.coverage
+coverage.*
+.tox/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# FastAPI/Starlette logs
+*.log
+
+# React/Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+# Build output
+build/
+dist/
+# dotenv
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Docker
+*.pid
+*.seed
+*.pid.lock
+
+# Editor/OS
+.DS_Store
+*.swp
+*.swo
+*.~lock.*
+.idea/
+.vscode/
+*.iml
+
+# Docker volumes (if mounted)
+docker-volumes/
+dockervolumes/
+mnt/data/
+mnt/data/*
+!mnt/data/.gitkeep
+
+# Ignore all test output
+htmlcov/
+*.cover
+*.py,cover
+
+# If using pytest
+.cache/
+
+# Ignore secrets
+secrets/
+*.pem
+*.key
+*.crt
+
+# Ignore backup files
+*~
+*.bak
+*.tmp
+
+# Ignore frontend env files
+frontend/.env
+frontend/.env.*
+
+# Ignore backend env files
+backend/.env
+backend/.env.*
