@@ -23,7 +23,11 @@ MAX_VERSION_LENGTH = 100
 MAX_OS_LENGTH = 50
 
 # Determine data directory based on environment variable
-DATA_DIR = os.environ.get("FLEETPULSE_DATA_DIR", "/data")
+# Support both FLEETPULSE_DATA_DIR (preferred) and FLEETPULSE_DATA_PATH (for backward compatibility)
+# Handle empty string values by treating them as unset
+data_dir_env = os.environ.get("FLEETPULSE_DATA_DIR")
+data_path_env = os.environ.get("FLEETPULSE_DATA_PATH")
+DATA_DIR = (data_dir_env if data_dir_env else data_path_env) or "/data"
 DB_PATH = os.path.join(DATA_DIR, "updates.db")
 
 # Global engine variable
