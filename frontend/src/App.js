@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, createContext, useContext } from 'react';
 import axios from 'axios';
 import {
   Container,
@@ -18,17 +18,96 @@ import {
   Toolbar,
   CircularProgress,
   CssBaseline,
+  Switch,
+  FormControlLabel,
+  useMediaQuery,
+  ThemeProvider,
+  createTheme,
 } from '@mui/material';
 import StorageIcon from '@mui/icons-material/Storage';
 import DnsIcon from '@mui/icons-material/Dns';
+import Brightness4Icon from '@mui/icons-material/Brightness4';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
 
 const API_BASE = '';
+
+// Theme Context
+const ThemeContext = createContext();
+
+// Custom hook to use theme context
+const useTheme = () => {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
+};
+
+// Theme provider component
+const CustomThemeProvider = ({ children }) => {
+  // Safely handle useMediaQuery in test environment
+  let prefersDarkMode = false;
+  try {
+    prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
+  } catch (error) {
+    // Fallback for test environment
+    prefersDarkMode = false;
+  }
+  
+  // Initialize theme mode from localStorage or system preference
+  const [mode, setMode] = useState(() => {
+    const savedMode = localStorage.getItem('themeMode');
+    return savedMode || (prefersDarkMode ? 'dark' : 'light');
+  });
+
+  // Create Material-UI theme based on mode
+  const theme = createTheme({
+    palette: {
+      mode,
+      ...(mode === 'light'
+        ? {
+            // Light theme colors
+            primary: {
+              main: '#1976d2',
+            },
+          }
+        : {
+            // Dark theme colors
+            primary: {
+              main: '#90caf9',
+            },
+          }),
+    },
+  });
+
+  // Toggle theme mode
+  const toggleTheme = () => {
+    const newMode = mode === 'light' ? 'dark' : 'light';
+    setMode(newMode);
+    localStorage.setItem('themeMode', newMode);
+  };
+
+  const value = {
+    mode,
+    toggleTheme,
+    theme,
+  };
+
+  return (
+    <ThemeContext.Provider value={value}>
+      <ThemeProvider theme={theme}>
+        {children}
+      </ThemeProvider>
+    </ThemeContext.Provider>
+  );
+};
 
 function App() {
   const [hosts, setHosts] = useState([]);
   const [selectedHost, setSelectedHost] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+  const { mode, toggleTheme } = useTheme();
 
   useEffect(() => {
     axios.get(`${API_BASE}/hosts`)
@@ -49,9 +128,26 @@ function App() {
       <AppBar position="static" sx={{ marginBottom: 4 }}>
         <Toolbar>
           <StorageIcon sx={{ marginRight: 2 }} />
-          <Typography variant="h6" component="div">
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             FleetPulse &mdash; Linux Fleet Package Dashboard
           </Typography>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={mode === 'dark'}
+                onChange={toggleTheme}
+                color="default"
+                inputProps={{ 'aria-label': 'dark mode toggle' }}
+              />
+            }
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', color: 'inherit' }}>
+                {mode === 'light' ? <Brightness7Icon /> : <Brightness4Icon />}
+              </Box>
+            }
+            labelPlacement="start"
+            sx={{ ml: 1, color: 'inherit' }}
+          />
         </Toolbar>
       </AppBar>
       <Container maxWidth="md">
@@ -134,4 +230,13 @@ function App() {
   );
 }
 
-export default App;
+// Wrapped App component with theme provider
+function AppWithTheme() {
+  return (
+    <CustomThemeProvider>
+      <App />
+    </CustomThemeProvider>
+  );
+}
+
+export default AppWithTheme;
