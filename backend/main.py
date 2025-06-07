@@ -65,13 +65,37 @@ def get_engine():
     global engine
     if engine is None:
         try:
+            logger.info(f"Creating database engine for: {DB_PATH}")
+            
+            # Ensure the directory exists
+            db_dir = os.path.dirname(DB_PATH)
+            if not os.path.exists(db_dir):
+                logger.info(f"Creating database directory: {db_dir}")
+                os.makedirs(db_dir, exist_ok=True)
+            
+            # Check if we can write to the database directory
+            if not os.access(db_dir, os.W_OK):
+                raise PermissionError(f"Cannot write to database directory: {db_dir}")
+            
             engine = create_engine(
                 f"sqlite:///{DB_PATH}",
                 connect_args={"check_same_thread": False},
                 echo=False  # Set to True for SQL debugging
             )
+            
+            # Test the connection
+            with engine.connect() as conn:
+                conn.execute("SELECT 1")
+            
+            logger.info(f"Database engine created successfully: {DB_PATH}")
+            
         except Exception as e:
             logger.error(f"Failed to create database engine: {e}")
+            logger.error(f"Database path: {DB_PATH}")
+            logger.error(f"Database directory: {os.path.dirname(DB_PATH)}")
+            logger.error(f"Directory exists: {os.path.exists(os.path.dirname(DB_PATH))}")
+            if os.path.exists(os.path.dirname(DB_PATH)):
+                logger.error(f"Directory writable: {os.access(os.path.dirname(DB_PATH), os.W_OK)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database connection failed"
@@ -131,10 +155,31 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager for startup and shutdown events."""
     # Startup
     try:
+        logger.info(f"Starting FleetPulse application")
+        logger.info(f"Data directory: {DATA_DIR}")
+        logger.info(f"Database path: {DB_PATH}")
+        
+        # Check if data directory exists and permissions
+        if os.path.exists(DATA_DIR):
+            logger.info(f"Data directory exists: {DATA_DIR}")
+            # Check if we can write to it
+            test_file = os.path.join(DATA_DIR, "test_write.tmp")
+            try:
+                with open(test_file, 'w') as f:
+                    f.write("test")
+                os.remove(test_file)
+                logger.info("Data directory is writable")
+            except Exception as e:
+                logger.error(f"Cannot write to data directory: {e}")
+                raise
+        else:
+            logger.info(f"Creating data directory: {DATA_DIR}")
+        
         os.makedirs(DATA_DIR, exist_ok=True)
         logger.info(f"Data directory ensured: {DATA_DIR}")
         
         # Create tables
+        logger.info("Creating database tables...")
         SQLModel.metadata.create_all(get_engine())
         logger.info("Database tables created successfully")
         

@@ -34,7 +34,9 @@ COPY --from=frontend-build /app/frontend/build ./static
 
 # Create a non-root user and switch to it
 RUN adduser --disabled-password --no-create-home appuser && \
-    chown -R appuser:appuser /app
+    chown -R appuser:appuser /app && \
+    mkdir -p /data && \
+    chown -R appuser:appuser /data
 USER appuser
 
 # Expose port 8000 for the combined service
