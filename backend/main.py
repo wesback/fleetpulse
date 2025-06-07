@@ -227,7 +227,7 @@ app = FastAPI(
 )
 
 # Mount static files (React frontend build)
-static_dir = os.path.join(os.path.dirname(__file__), "static")
+static_dir = os.path.join(os.path.dirname(__file__), "static", "static")
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
     logger.info(f"Static files mounted from: {static_dir}")
