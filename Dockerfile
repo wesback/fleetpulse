@@ -10,6 +10,10 @@ RUN npm run build
 # Stage 2: Build the Python backend with frontend assets
 FROM python:3.13-slim AS backend
 
+# Build arguments for user configuration
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+
 # Set environment variables for Python best practices
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -32,10 +36,13 @@ COPY backend/ ./
 # Copy built frontend assets from the previous stage
 COPY --from=frontend-build /app/frontend/build ./static
 
-# Create a non-root user and switch to it
-RUN adduser --disabled-password --no-create-home appuser && \
+# Create data directory with proper permissions
+RUN mkdir -p /data && chmod 755 /data
+
+# Create a non-root user with configurable UID/GID for better volume compatibility
+RUN groupadd -g ${GROUP_ID} appuser && \
+    useradd -u ${USER_ID} -g ${GROUP_ID} -M -s /bin/bash appuser && \
     chown -R appuser:appuser /app && \
-    mkdir -p /data && \
     chown -R appuser:appuser /data
 USER appuser
 

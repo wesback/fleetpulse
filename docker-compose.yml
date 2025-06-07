@@ -4,9 +4,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: fleetpulse-combined
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    container_name: fleetpulse-app
     volumes:
       - ${FLEETPULSE_DATA_PATH:-./data}:/data
     ports:
       - "8080:8000"
     restart: unless-stopped
+    environment:
+      - FLEETPULSE_DATA_DIR=/data
