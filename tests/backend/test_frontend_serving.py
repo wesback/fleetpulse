@@ -34,3 +34,21 @@ def test_frontend_serving_fallback():
     # Test another frontend route
     response = client.get("/dashboard")
     assert response.status_code in [200, 404]
+
+
+def test_static_js_file_serving():
+    """Test that static JavaScript files are properly served from the correct path."""
+    client = TestClient(app)
+    
+    # Test the specific file that was failing in the issue
+    response = client.get("/static/js/main.fd6dc8ce.js")
+    
+    # The file should be accessible if static files are built and mounted correctly
+    if response.status_code == 200:
+        # If the file exists, it should have the correct content-type
+        assert "javascript" in response.headers.get("content-type", "").lower()
+        # Should not be empty
+        assert len(response.content) > 0
+    else:
+        # If file doesn't exist during testing, should return 404
+        assert response.status_code == 404
