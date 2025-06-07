@@ -7,11 +7,10 @@ It collects update reports (host, OS, date, packages upgraded, old/new versions)
 
 ## Features
 
-- 🚀 **FastAPI backend** with SQLite database (or switchable to Postgres)
+- 🚀 **FastAPI backend** with SQLite database
 - ⚡ **React frontend** with Material UI for a modern look
 - 📦 **Works with any OS**: Includes drop-in Ansible snippets for ArchLinux and Debian/Ubuntu
 - 🐳 **Docker Compose**: One command to launch everything
-- 🔒 **Prevents duplicate upgrade records per host/package/day**
 - 👀 **Zero-config UI**: Open your browser and see updates at a glance
 
 ---

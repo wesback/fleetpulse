@@ -67,6 +67,7 @@ htmlcov/
 
 # If using pytest
 .cache/
+__pycache__/
 
 # Ignore secrets
 secrets/
