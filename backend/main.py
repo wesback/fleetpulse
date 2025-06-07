@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlmodel import SQLModel, Field, Session, create_engine, select
+from sqlalchemy import text
 from typing import List, Optional, Dict, Any
 from datetime import date
 import os
@@ -85,7 +86,7 @@ def get_engine():
             
             # Test the connection
             with engine.connect() as conn:
-                conn.execute("SELECT 1")
+                conn.execute(text("SELECT 1"))
             
             logger.info(f"Database engine created successfully: {DB_PATH}")
             
