@@ -11,7 +11,8 @@ services:
     volumes:
       - ${FLEETPULSE_DATA_PATH:-./data}:/data
     ports:
-      - "8080:8000"
+      - "8000:8000"  # Backend API
+      - "8080:8080"  # Frontend UI (alternative access)
     restart: unless-stopped
     environment:
       - FLEETPULSE_DATA_DIR=/data
