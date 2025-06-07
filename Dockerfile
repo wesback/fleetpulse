@@ -46,8 +46,8 @@ RUN groupadd -g ${GROUP_ID} appuser && \
     chown -R appuser:appuser /data
 USER appuser
 
-# Expose port 8000 for the combined service
-EXPOSE 8000
+# Expose port 8000 8080 for the combined service
+EXPOSE 8000 8080
 
 # Production mode: Choose between uvicorn (simple) and gunicorn (production)
 # DEPLOYMENT_MODE: "uvicorn" for single-process, "gunicorn" for multi-process
