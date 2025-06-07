@@ -50,7 +50,8 @@ USER appuser
 EXPOSE 8000
 
 # Use gunicorn with uvicorn workers for production
-CMD ["gunicorn", "main:app", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--workers", "4"]
+# Default to 2 workers for single-container deployment, configurable via GUNICORN_WORKERS
+CMD ["sh", "-c", "gunicorn main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-2}"]
 
 # Add a healthcheck
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

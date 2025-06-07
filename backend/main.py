@@ -179,10 +179,35 @@ async def lifespan(app: FastAPI):
         os.makedirs(DATA_DIR, exist_ok=True)
         logger.info(f"Data directory ensured: {DATA_DIR}")
         
-        # Create tables
-        logger.info("Creating database tables...")
-        SQLModel.metadata.create_all(get_engine())
-        logger.info("Database tables created successfully")
+        # Initialize database tables
+        force_recreate = os.environ.get("FORCE_DB_RECREATE", "false").lower() == "true"
+        engine = get_engine()
+        
+        if force_recreate:
+            logger.info("Force recreation enabled - dropping and recreating all tables...")
+            SQLModel.metadata.drop_all(engine)
+            SQLModel.metadata.create_all(engine)
+            logger.info("Database tables recreated successfully")
+        else:
+            # Check if database exists and has tables
+            db_exists = os.path.exists(DB_PATH) and os.path.getsize(DB_PATH) > 0
+            
+            if db_exists:
+                # Check if our main table exists
+                from sqlalchemy import inspect
+                inspector = inspect(engine)
+                existing_tables = inspector.get_table_names()
+                
+                if "package_updates" in existing_tables:
+                    logger.info("Database tables already exist - skipping creation")
+                else:
+                    logger.info("Database exists but tables missing - creating tables...")
+                    SQLModel.metadata.create_all(engine)
+                    logger.info("Database tables created successfully")
+            else:
+                logger.info("New database - creating tables...")
+                SQLModel.metadata.create_all(engine)
+                logger.info("Database tables created successfully")
         
     except Exception as e:
         logger.error(f"Startup failed: {e}")
