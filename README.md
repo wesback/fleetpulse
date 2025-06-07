@@ -3,6 +3,8 @@
 **FleetPulse** is a lightweight dashboard to monitor and audit Linux package updates across your fleet.  
 It collects update reports (host, OS, date, packages upgraded, old/new versions) via a simple API and displays them in a modern, browser-friendly web UI.
 
+Vibcoding for the win!
+
 ---
 
 ## Features
@@ -24,10 +26,20 @@ It collects update reports (host, OS, date, packages upgraded, old/new versions)
     cd fleetpulse
     ```
 
-2. **Set up Docker volumes (optional, for persistent storage)**
+2. **Configure data storage (optional)**
 
+    By default, data is stored in `./data` directory. To customize the storage location:
+    
     ```bash
-    mkdir -p /mnt/data/dockervolumes/fleetpulse
+    # Option 1: Set environment variable
+    export FLEETPULSE_DATA_PATH=/your/preferred/path
+    
+    # Option 2: Copy and edit the environment file
+    cp .env.example .env
+    # Edit .env to set FLEETPULSE_DATA_PATH
+    
+    # Option 3: Create the directory and let Docker Compose use the default
+    mkdir -p ./data
     ```
 
 3. **Launch the stack**
@@ -41,6 +53,11 @@ It collects update reports (host, OS, date, packages upgraded, old/new versions)
 
 4. **Open the dashboard:**  
    Visit [http://YOUR-HOST-IP:8080](http://YOUR-HOST-IP:8080) from any browser on your LAN.
+
+---
+
+
+For more details, see the `docker-compose.yml` and Dockerfiles in the repository.
 
 ---
 
@@ -90,3 +107,46 @@ Add the relevant Ansible snippet to your playbooks and your updates will appear 
       }
     status_code: 200
   when: updated_packages_json.stdout != "[]"
+```
+
+---
+
+## Running Tests
+
+### Backend Tests
+
+The backend tests use `pytest` and are located in `tests/backend/`.
+
+1. (Recommended) Create and activate a Python virtual environment from the project root:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+2. Install dependencies (pytest is included in requirements.txt):
+   ```bash
+   pip install -r backend/requirements.txt
+   ```
+3. Run the tests from the project root:
+   ```bash
+   pytest tests/backend/
+   ```
+   Or use the provided script (recommended - handles both backend and frontend):
+   ```bash
+   ./run_tests.sh
+   ```
+
+### Frontend Tests
+
+The frontend tests use Jest and React Testing Library, located in `src/App.test.js`.
+
+1. Install dependencies:
+   ```bash
+   cd frontend
+   npm install
+   ```
+2. Run the tests:
+   ```bash
+   npm test
+   ```
+
+**Note:** The `run_tests.sh` script automatically runs both backend and frontend tests for convenience.

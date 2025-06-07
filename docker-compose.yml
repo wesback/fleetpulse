@@ -1,23 +1,12 @@
 ---
 services:
-  backend:
+  fleetpulse:
     build:
       context: .
-      dockerfile: Dockerfile.backend
-    container_name: fleet-backend
+      dockerfile: Dockerfile
+    container_name: fleetpulse-combined
     volumes:
-      - /mnt/data/dockervolumes/fleetpulse:/data
+      - ${FLEETPULSE_DATA_PATH:-./data}:/data
     ports:
-      - "8000:8000"
-    restart: unless-stopped
-
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    container_name: fleet-frontend
-    ports:
-      - "8080:80"
-    depends_on:
-      - backend
+      - "8080:8000"
     restart: unless-stopped

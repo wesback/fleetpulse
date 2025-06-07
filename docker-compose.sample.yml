@@ -1,0 +1,71 @@
+---
+# Sample Docker Compose file using pre-built container from wesback/fleetpulse
+# This file demonstrates how to deploy FleetPulse using the published Docker image
+
+services:
+  fleetpulse:
+    image: wesback/fleetpulse:latest
+    container_name: fleetpulse-app
+    ports:
+      # Map host port 8080 to container port 8000 (combined frontend + backend)
+      - "8080:8000"
+    volumes:
+      # Mount data directory for persistent storage
+      - fleetpulse_data:/data
+      # Optional: Mount configuration files
+      # - ./config:/app/config:ro
+    environment:
+      # Add environment variables as needed for your deployment
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Add a database service if your application requires one
+  # database:
+  #   image: postgres:15-alpine
+  #   container_name: fleetpulse-db
+  #   environment:
+  #     POSTGRES_DB: fleetpulse
+  #     POSTGRES_USER: fleetpulse
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   restart: unless-stopped
+
+  # Optional: Add Redis for caching/session storage
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: fleetpulse-redis
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   restart: unless-stopped
+
+volumes:
+  fleetpulse_data:
+    driver: local
+  # postgres_data:
+  #   driver: local
+  # redis_data:
+  #   driver: local
+
+# Optional: Create a custom network
+networks:
+  fleetpulse_network:
+    driver: bridge
+
+# Usage Instructions:
+# 1. Copy this file to your deployment server
+# 2. Rename it to docker-compose.yml or use: docker-compose -f docker-compose.sample.yml up
+# 3. Update environment variables and port mappings as needed
+# 4. Create a .env file for sensitive configuration values
+# 5. Run: docker-compose up -d
+# 6. Access the application at http://localhost:8080

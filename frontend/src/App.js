@@ -22,7 +22,7 @@ import {
 import StorageIcon from '@mui/icons-material/Storage';
 import DnsIcon from '@mui/icons-material/Dns';
 
-const API_BASE = `http://${window.location.hostname}:8000`;
+const API_BASE = '';
 
 function App() {
   const [hosts, setHosts] = useState([]);
@@ -105,7 +105,7 @@ function App() {
                           <TableBody>
                             {history.map((rec, i) => (
                               <TableRow key={i}>
-                                <TableCell>{rec.date}</TableCell>
+                                <TableCell>{rec.update_date}</TableCell>
                                 <TableCell>{rec.os}</TableCell>
                                 <TableCell>{rec.name}</TableCell>
                                 <TableCell>{rec.old_version}</TableCell>
