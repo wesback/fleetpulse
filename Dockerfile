@@ -49,8 +49,10 @@ USER appuser
 # Expose port 8000 for the combined service
 EXPOSE 8000
 
-# Use gunicorn with uvicorn workers for production
-CMD ["gunicorn", "main:app", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--workers", "4"]
+# Production mode: Choose between uvicorn (simple) and gunicorn (production)
+# DEPLOYMENT_MODE: "uvicorn" for single-process, "gunicorn" for multi-process
+# Default to uvicorn for single-container simplicity
+CMD ["sh", "-c", "if [ \"${DEPLOYMENT_MODE:-uvicorn}\" = \"gunicorn\" ]; then gunicorn main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-2}; else uvicorn main:app --host 0.0.0.0 --port 8000; fi"]
 
 # Add a healthcheck
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

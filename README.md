@@ -56,6 +56,73 @@ Vibcoding for the win!
 
 ---
 
+## Deployment Configuration
+
+FleetPulse supports flexible deployment modes to match your specific use case:
+
+### Deployment Modes
+
+#### **Uvicorn Mode (Default - Recommended)**
+Single-process deployment optimized for simplicity and resource efficiency:
+
+```bash
+# Default in .env or docker-compose.yml
+DEPLOYMENT_MODE=uvicorn
+```
+
+**Best for:**
+- Single-container deployments
+- Development environments  
+- Low to medium traffic (< 100 concurrent users)
+- Simplified setup and debugging
+- Lower memory footprint
+
+#### **Gunicorn Mode**
+Multi-process deployment with enhanced fault tolerance:
+
+```bash
+# For high-traffic production deployments
+DEPLOYMENT_MODE=gunicorn
+GUNICORN_WORKERS=4  # Scale based on your needs
+```
+
+**Best for:**
+- High-traffic production deployments (> 100 concurrent users)
+- When you need process-level fault tolerance
+- Multi-core CPU utilization requirements
+
+### Configuration Examples
+
+**Production (simple):**
+```bash
+DEPLOYMENT_MODE=uvicorn
+FORCE_DB_RECREATE=false
+```
+
+**High-traffic production:**
+```bash
+DEPLOYMENT_MODE=gunicorn
+GUNICORN_WORKERS=6
+FORCE_DB_RECREATE=false
+```
+
+**Development:**
+```bash
+DEPLOYMENT_MODE=uvicorn
+FORCE_DB_RECREATE=true  # Reset database on each startup
+```
+
+### Why We Default to Uvicorn
+
+For FleetPulse's typical use case (fleet package update monitoring), the traffic patterns are:
+- Periodic update reports from hosts
+- Occasional dashboard access by administrators
+- I/O-bound operations (database queries, static file serving)
+
+Uvicorn provides excellent performance for this workload while being simpler to configure and debug.
+
+---
+
 
 For more details, see the `docker-compose.yml` and Dockerfiles in the repository.
 
