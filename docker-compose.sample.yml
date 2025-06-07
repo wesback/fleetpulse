@@ -7,7 +7,9 @@ services:
     image: wesback/fleetpulse:latest
     container_name: fleetpulse-app
     ports:
-      # Map host port 8080 to container port 8000 (combined frontend + backend)
+      # Map host port 8000 to container port 8000 (backend API)
+      - "8000:8000"
+      # Map host port 8080 to container port 8000 (frontend UI - alternative access)
       - "8080:8000"
     volumes:
       # Mount data directory for persistent storage
