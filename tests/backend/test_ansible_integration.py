@@ -38,7 +38,7 @@ def test_ui_access_still_available():
     
     # Check that port 8080 is still exposed for frontend UI
     # This maintains backward compatibility for users accessing the UI
-    ui_port_exposed = any('8080:8000' in str(port) for port in ports)
+    ui_port_exposed = any('8080:8080' in str(port) for port in ports)
     
     assert ui_port_exposed, (
         "Frontend UI should still be accessible on port 8080 for backward compatibility. "
@@ -94,8 +94,8 @@ def test_sample_docker_compose_consistency():
     assert sample_has_backend, "Sample docker-compose.yml should expose backend API on port 8000"
     
     # Both should expose port 8080 for UI
-    main_has_ui = any('8080:8000' in str(port) for port in main_ports)
-    sample_has_ui = any('8080:8000' in str(port) for port in sample_ports)
+    main_has_ui = any('8080:8080' in str(port) for port in main_ports)
+    sample_has_ui = any('8080:8080' in str(port) for port in sample_ports)
     
     assert main_has_ui, "Main docker-compose.yml should expose UI on port 8080"
     assert sample_has_ui, "Sample docker-compose.yml should expose UI on port 8080"
