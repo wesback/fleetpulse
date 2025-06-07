@@ -38,7 +38,7 @@ def test_docker_compose_exposes_frontend_port():
     ports = fleetpulse_service.get('ports', [])
     
     # Check that port 8080 is exposed for frontend UI
-    frontend_port_exposed = any('8080:8000' in str(port) for port in ports)
+    frontend_port_exposed = any('8080:8080' in str(port) for port in ports)
     
     assert frontend_port_exposed, (
         "Port 8080 should be exposed for frontend UI access. "
