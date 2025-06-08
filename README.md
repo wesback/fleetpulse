@@ -11,6 +11,7 @@ Vibcoding for the win!
 
 - 🚀 **FastAPI backend** with SQLite database
 - ⚡ **React frontend** with Material UI for a modern look
+- 💬 **Natural Language Chat**: Ask questions like "Which hosts had Python packages updated last week?"
 - 📦 **Works with any OS**: Includes drop-in Ansible snippets for ArchLinux and Debian/Ubuntu
 - 🐳 **Docker Compose**: One command to launch everything
 - 👀 **Zero-config UI**: Open your browser and see updates at a glance
@@ -53,6 +54,40 @@ Vibcoding for the win!
 
 4. **Open the dashboard:**  
    Visit [http://YOUR-HOST-IP:8080](http://YOUR-HOST-IP:8080) from any browser on your LAN.
+
+---
+
+## Using the Chat Interface
+
+FleetPulse includes a natural language chat interface powered by intelligent query parsing. Click the **chat button** (💬) in the bottom-right corner to start asking questions about your package updates.
+
+### Example Questions
+
+- **"Which hosts had Python packages updated last week?"**
+- **"What packages were updated on web-01?"**
+- **"Show me Ubuntu hosts"**
+- **"Which hosts haven't been updated in 30 days?"**
+- **"How many hosts do we have?"**
+
+### Supported Query Patterns
+
+| Question Type | Example | What it does |
+|---------------|---------|--------------|
+| **Host Search** | "Which hosts had nginx updated last month?" | Finds hosts with specific package updates in a timeframe |
+| **Package Lookup** | "What packages were updated on server-01?" | Shows all package updates for a specific host |
+| **OS Filtering** | "Show me CentOS hosts" | Lists hosts running a specific operating system |
+| **Stale Detection** | "Which hosts haven't been updated in 7 days?" | Identifies hosts that may need attention |
+| **Fleet Status** | "How many Ubuntu hosts do we have?" | Provides counts and fleet statistics |
+
+### Smart Features
+
+- **Timeframe Detection**: Understands "last week", "past month", "7 days ago", etc.
+- **Package Recognition**: Automatically detects common package names like Python, nginx, Docker
+- **Hostname Extraction**: Finds hostnames in your questions (web-01, server-02, etc.)
+- **Structured Results**: Displays both human-readable answers and clickable data chips
+- **Error Handling**: Provides helpful suggestions when queries aren't understood
+
+The chat interface integrates seamlessly with your existing FleetPulse data, making it easy to get insights without navigating through filters and tables.
 
 ---
 
