@@ -146,3 +146,196 @@ def test_last_updates_with_data(client_with_db_override):
     assert host2_data is not None
     assert host2_data["os"] == "os2"
     assert host2_data["last_update"] == yesterday.isoformat()
+
+def test_host_history_with_date_filters(client_with_db_override):
+    """Test date filtering functionality."""
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+    two_days_ago = today - timedelta(days=2)
+    
+    # Create test data with different dates
+    client_with_db_override.post("/report", json={
+        "hostname": "filter-host", "os": "ubuntu", "update_date": today.isoformat(),
+        "updated_packages": [{"name": "pkg1", "old_version": "1.0", "new_version": "1.1"}]
+    })
+    client_with_db_override.post("/report", json={
+        "hostname": "filter-host", "os": "ubuntu", "update_date": yesterday.isoformat(),
+        "updated_packages": [{"name": "pkg2", "old_version": "2.0", "new_version": "2.1"}]
+    })
+    client_with_db_override.post("/report", json={
+        "hostname": "filter-host", "os": "ubuntu", "update_date": two_days_ago.isoformat(),
+        "updated_packages": [{"name": "pkg3", "old_version": "3.0", "new_version": "3.1"}]
+    })
+    
+    # Test date_from filter
+    response = client_with_db_override.get(f"/history/filter-host?date_from={yesterday.isoformat()}")
+    assert response.status_code == 200
+    history = response.json()
+    assert len(history) == 2  # Today and yesterday
+    dates = [item['update_date'] for item in history]
+    assert today.isoformat() in dates
+    assert yesterday.isoformat() in dates
+    assert two_days_ago.isoformat() not in dates
+    
+    # Test date_to filter
+    response = client_with_db_override.get(f"/history/filter-host?date_to={yesterday.isoformat()}")
+    assert response.status_code == 200
+    history = response.json()
+    assert len(history) == 2  # Yesterday and two days ago
+    dates = [item['update_date'] for item in history]
+    assert yesterday.isoformat() in dates
+    assert two_days_ago.isoformat() in dates
+    assert today.isoformat() not in dates
+    
+    # Test date range filter
+    response = client_with_db_override.get(f"/history/filter-host?date_from={yesterday.isoformat()}&date_to={today.isoformat()}")
+    assert response.status_code == 200
+    history = response.json()
+    assert len(history) == 2  # Today and yesterday
+    dates = [item['update_date'] for item in history]
+    assert today.isoformat() in dates
+    assert yesterday.isoformat() in dates
+    assert two_days_ago.isoformat() not in dates
+
+def test_host_history_with_os_filter(client_with_db_override):
+    """Test OS filtering functionality."""
+    today = date.today()
+    
+    # Create test data with different OS
+    client_with_db_override.post("/report", json={
+        "hostname": "os-filter-host", "os": "ubuntu-20.04", "update_date": today.isoformat(),
+        "updated_packages": [{"name": "pkg1", "old_version": "1.0", "new_version": "1.1"}]
+    })
+    client_with_db_override.post("/report", json={
+        "hostname": "os-filter-host", "os": "centos-8", "update_date": today.isoformat(),
+        "updated_packages": [{"name": "pkg2", "old_version": "2.0", "new_version": "2.1"}]
+    })
+    client_with_db_override.post("/report", json={
+        "hostname": "os-filter-host", "os": "ubuntu-20.04", "update_date": today.isoformat(),
+        "updated_packages": [{"name": "pkg3", "old_version": "3.0", "new_version": "3.1"}]
+    })
+    
+    # Test OS filter
+    response = client_with_db_override.get("/history/os-filter-host?os=ubuntu-20.04")
+    assert response.status_code == 200
+    history = response.json()
+    assert len(history) == 2  # Two ubuntu packages
+    for item in history:
+        assert item['os'] == 'ubuntu-20.04'
+    
+    response = client_with_db_override.get("/history/os-filter-host?os=centos-8")
+    assert response.status_code == 200
+    history = response.json()
+    assert len(history) == 1  # One centos package
+    assert history[0]['os'] == 'centos-8'
+
+def test_host_history_with_package_filter(client_with_db_override):
+    """Test package name filtering functionality."""
+    today = date.today()
+    
+    # Create test data with different package names
+    client_with_db_override.post("/report", json={
+        "hostname": "pkg-filter-host", "os": "ubuntu", "update_date": today.isoformat(),
+        "updated_packages": [
+            {"name": "nginx", "old_version": "1.0", "new_version": "1.1"},
+            {"name": "apache2", "old_version": "2.0", "new_version": "2.1"},
+            {"name": "nginx-common", "old_version": "1.0", "new_version": "1.1"}
+        ]
+    })
+    
+    # Test exact package name filter
+    response = client_with_db_override.get("/history/pkg-filter-host?package=nginx")
+    assert response.status_code == 200
+    history = response.json()
+    assert len(history) == 2  # nginx and nginx-common (partial match)
+    package_names = [item['name'] for item in history]
+    assert 'nginx' in package_names
+    assert 'nginx-common' in package_names
+    assert 'apache2' not in package_names
+    
+    # Test partial package name filter
+    response = client_with_db_override.get("/history/pkg-filter-host?package=apa")
+    assert response.status_code == 200
+    history = response.json()
+    assert len(history) == 1  # apache2
+    assert history[0]['name'] == 'apache2'
+
+def test_host_history_with_combined_filters(client_with_db_override):
+    """Test combining multiple filters."""
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+    
+    # Create test data with various combinations
+    client_with_db_override.post("/report", json={
+        "hostname": "combo-host", "os": "ubuntu", "update_date": today.isoformat(),
+        "updated_packages": [{"name": "nginx", "old_version": "1.0", "new_version": "1.1"}]
+    })
+    client_with_db_override.post("/report", json={
+        "hostname": "combo-host", "os": "centos", "update_date": today.isoformat(),
+        "updated_packages": [{"name": "nginx", "old_version": "1.0", "new_version": "1.1"}]
+    })
+    client_with_db_override.post("/report", json={
+        "hostname": "combo-host", "os": "ubuntu", "update_date": yesterday.isoformat(),
+        "updated_packages": [{"name": "apache", "old_version": "2.0", "new_version": "2.1"}]
+    })
+    
+    # Test combining OS and package filters
+    response = client_with_db_override.get("/history/combo-host?os=ubuntu&package=nginx")
+    assert response.status_code == 200
+    history = response.json()
+    assert len(history) == 1
+    assert history[0]['os'] == 'ubuntu'
+    assert history[0]['name'] == 'nginx'
+    
+    # Test combining date and OS filters
+    response = client_with_db_override.get(f"/history/combo-host?date_from={today.isoformat()}&os=ubuntu")
+    assert response.status_code == 200
+    history = response.json()
+    assert len(history) == 1
+    assert history[0]['os'] == 'ubuntu'
+    assert history[0]['update_date'] == today.isoformat()
+
+def test_host_history_filter_validation(client_with_db_override):
+    """Test filter parameter validation."""
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
+    
+    # Create test data
+    client_with_db_override.post("/report", json={
+        "hostname": "valid-host", "os": "ubuntu", "update_date": today.isoformat(),
+        "updated_packages": [{"name": "pkg", "old_version": "1.0", "new_version": "1.1"}]
+    })
+    
+    # Test invalid date range (date_from > date_to)
+    response = client_with_db_override.get(f"/history/valid-host?date_from={tomorrow.isoformat()}&date_to={today.isoformat()}")
+    assert response.status_code == 400
+    error_msg = response.json().get('error') or response.json().get('detail')
+    assert "date_from cannot be after date_to" in error_msg
+    
+    # Test invalid OS format
+    response = client_with_db_override.get("/history/valid-host?os=invalid$os")
+    assert response.status_code == 400
+    error_msg = response.json().get('error') or response.json().get('detail')
+    assert "Invalid OS format" in error_msg
+    
+    # Test invalid package name
+    response = client_with_db_override.get("/history/valid-host?package=invalid$package")
+    assert response.status_code == 400
+    error_msg = response.json().get('error') or response.json().get('detail')
+    assert "Invalid package name format" in error_msg
+
+def test_host_history_no_results_with_filters(client_with_db_override):
+    """Test that 404 is returned when filters yield no results."""
+    today = date.today()
+    
+    # Create test data
+    client_with_db_override.post("/report", json={
+        "hostname": "no-results-host", "os": "ubuntu", "update_date": today.isoformat(),
+        "updated_packages": [{"name": "nginx", "old_version": "1.0", "new_version": "1.1"}]
+    })
+    
+    # Test filter that should yield no results
+    response = client_with_db_override.get("/history/no-results-host?package=nonexistent")
+    assert response.status_code == 404
+    error_msg = response.json().get('error') or response.json().get('detail')
+    assert "No update history found" in error_msg
