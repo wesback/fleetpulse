@@ -29,7 +29,7 @@ import DnsIcon from '@mui/icons-material/Dns';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 
-const API_BASE = '';
+const API_BASE = '/api';
 
 // Theme Context
 const ThemeContext = createContext();
@@ -112,7 +112,10 @@ function App() {
   useEffect(() => {
     axios.get(`${API_BASE}/hosts`)
       .then(res => setHosts(Array.isArray(res.data.hosts) ? res.data.hosts : []))
-      .catch(() => setHosts([])); // Defensive: always set to array
+      .catch((err) => {
+        console.error('Error fetching hosts:', err);
+        setHosts([]); // Defensive: always set to array
+      });
   }, []);
 
   const fetchHistory = (host) => {
