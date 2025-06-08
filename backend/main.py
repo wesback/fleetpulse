@@ -1,8 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from sqlmodel import SQLModel, Field, Session, create_engine, select
 from sqlalchemy import text
 from typing import List, Optional, Dict, Any
@@ -226,14 +224,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Mount static files (React frontend build)
-static_dir = os.path.join(os.path.dirname(__file__), "static", "static")
-if os.path.exists(static_dir):
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
-    logger.info(f"Static files mounted from: {static_dir}")
-else:
-    logger.warning(f"Static directory not found: {static_dir}")
-
 # CORS middleware with more restrictive settings
 app.add_middleware(
     CORSMiddleware,
@@ -432,22 +422,6 @@ def health_check():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Service unhealthy"
-        )
-
-@app.get("/{full_path:path}")
-def serve_frontend(full_path: str):
-    """Serve React frontend for all non-API routes."""
-    static_dir = os.path.join(os.path.dirname(__file__), "static")
-    index_file = os.path.join(static_dir, "index.html")
-    
-    # If static directory exists and index.html is present, serve it
-    if os.path.exists(static_dir) and os.path.exists(index_file):
-        return FileResponse(index_file)
-    else:
-        # Fallback if static files are not available
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Frontend not available"
         )
 
 if __name__ == "__main__":

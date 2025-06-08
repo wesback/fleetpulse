@@ -1,24 +1,23 @@
 ---
-# Sample Docker Compose file using pre-built container from wesback/fleetpulse
-# This file demonstrates how to deploy FleetPulse using the published Docker image
+# Sample Docker Compose file using pre-built containers from wesback/fleetpulse
+# This file demonstrates how to deploy FleetPulse using the published Docker images
 
 services:
-  fleetpulse:
-    image: wesback/fleetpulse:latest
-    container_name: fleetpulse-app
+  backend:
+    image: wesback/fleetpulse-backend:latest
+    container_name: fleetpulse-backend
     ports:
-      # Map host port 8000 to container port 8000 (backend API)
-      - "8000:8000"
-      # Map host port 8080 to container port 8080 (frontend UI - alternative access)
-      - "8080:8080"
+      - "8000:8000"  # Backend API
     volumes:
       # Mount data directory for persistent storage
       - fleetpulse_data:/data
       # Optional: Mount configuration files
       # - ./config:/app/config:ro
     environment:
-      # Add environment variables as needed for your deployment
-      - NODE_ENV=production
+      # Backend configuration
+      - FLEETPULSE_DATA_DIR=/data
+      - DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-uvicorn}
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -26,6 +25,19 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks:
+      - fleetpulse_network
+
+  frontend:
+    image: wesback/fleetpulse-frontend:latest
+    container_name: fleetpulse-frontend
+    ports:
+      - "8080:80"  # Frontend UI
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - fleetpulse_network
 
   # Optional: Add a database service if your application requires one
   # database:
@@ -59,7 +71,7 @@ volumes:
   # redis_data:
   #   driver: local
 
-# Optional: Create a custom network
+# Create a custom network
 networks:
   fleetpulse_network:
     driver: bridge
@@ -70,4 +82,4 @@ networks:
 # 3. Update environment variables and port mappings as needed
 # 4. Create a .env file for sensitive configuration values
 # 5. Run: docker-compose up -d
-# 6. Access the application at http://localhost:8080
+# 6. Access the application at http://localhost:8080 (frontend) and http://localhost:8000 (API)

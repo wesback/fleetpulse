@@ -49,7 +49,7 @@ Vibcoding for the win!
     ```
 
     - The **backend** runs on port **8000** (API)
-    - The **frontend** runs on port **8080** (UI)
+    - The **frontend** runs on port **8080** (UI served by nginx)
 
 4. **Open the dashboard:**  
    Visit [http://YOUR-HOST-IP:8080](http://YOUR-HOST-IP:8080) from any browser on your LAN.
@@ -58,9 +58,19 @@ Vibcoding for the win!
 
 ## Deployment Configuration
 
-FleetPulse supports flexible deployment modes to match your specific use case:
+FleetPulse is designed as a microservices architecture with separate frontend and backend containers for better scalability and maintainability.
 
-### Deployment Modes
+### Architecture Overview
+
+- **Frontend**: React application served by nginx on port 8080
+- **Backend**: FastAPI application on port 8000
+- **Communication**: Frontend proxies API calls to backend via nginx
+
+### Backend Deployment Modes
+
+The backend supports flexible deployment modes to match your specific use case:
+
+### Backend Deployment Modes
 
 #### **Uvicorn Mode (Default - Recommended)**
 Single-process deployment optimized for simplicity and resource efficiency:
@@ -91,13 +101,38 @@ GUNICORN_WORKERS=4  # Scale based on your needs
 - When you need process-level fault tolerance
 - Multi-core CPU utilization requirements
 
-### Configuration Examples
+### Service Configuration Examples
+
+**Development:**
+```bash
+# docker-compose.yml or .env
+DEPLOYMENT_MODE=uvicorn
+FORCE_DB_RECREATE=true
+```
 
 **Production (simple):**
 ```bash
+# docker-compose.yml or .env
 DEPLOYMENT_MODE=uvicorn
 FORCE_DB_RECREATE=false
 ```
+
+**Production (high-traffic):**
+```bash
+# docker-compose.yml or .env
+DEPLOYMENT_MODE=gunicorn
+GUNICORN_WORKERS=4
+FORCE_DB_RECREATE=false
+```
+
+### Docker Images
+
+FleetPulse publishes separate Docker images for frontend and backend:
+
+- **Backend**: `wesback/fleetpulse-backend:latest`
+- **Frontend**: `wesback/fleetpulse-frontend:latest`
+
+Use the provided `docker-compose.sample.yml` for production deployments with pre-built images.
 
 **High-traffic production:**
 ```bash
