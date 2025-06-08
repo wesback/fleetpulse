@@ -456,7 +456,7 @@ def handle_count_hosts_query(question: str, session: Session) -> ChatResponse:
         
         return ChatResponse(
             answer=answer,
-            data={"count": len(count)},
+            data=[{"count": len(count)}] if os_name else [{"count": len(count), "detail": "total_hosts"}],
             query_type="count_hosts"
         )
     except Exception as e:
