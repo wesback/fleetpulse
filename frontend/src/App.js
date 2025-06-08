@@ -23,11 +23,21 @@ import {
   useMediaQuery,
   ThemeProvider,
   createTheme,
+  TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Button,
+  Chip,
+  Stack,
 } from '@mui/material';
 import StorageIcon from '@mui/icons-material/Storage';
 import DnsIcon from '@mui/icons-material/Dns';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import ClearIcon from '@mui/icons-material/Clear';
 
 const API_BASE = '/api';
 
@@ -108,6 +118,17 @@ function App() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const { mode, toggleTheme } = useTheme();
+  
+  // Filter state
+  const [filters, setFilters] = useState({
+    dateFrom: '',
+    dateTo: '',
+    os: '',
+    package: ''
+  });
+  
+  // Available OS options for dropdown (populated from data)
+  const [availableOSes, setAvailableOSes] = useState([]);
 
   useEffect(() => {
     axios.get(`${API_BASE}/hosts`)
@@ -118,13 +139,61 @@ function App() {
       });
   }, []);
 
-  const fetchHistory = (host) => {
+  const fetchHistory = (host, currentFilters = filters) => {
     setLoading(true);
     setSelectedHost(host);
-    axios.get(`${API_BASE}/history/${host}`)
-      .then(res => setHistory(res.data))
+    
+    // Build query parameters
+    const params = new URLSearchParams();
+    if (currentFilters.dateFrom) params.append('date_from', currentFilters.dateFrom);
+    if (currentFilters.dateTo) params.append('date_to', currentFilters.dateTo);
+    if (currentFilters.os) params.append('os', currentFilters.os);
+    if (currentFilters.package) params.append('package', currentFilters.package);
+    
+    const queryString = params.toString();
+    const url = `${API_BASE}/history/${host}${queryString ? `?${queryString}` : ''}`;
+    
+    axios.get(url)
+      .then(res => {
+        setHistory(res.data);
+        // Extract unique OS values for dropdown
+        const osSet = new Set(res.data.map(item => item.os));
+        setAvailableOSes(Array.from(osSet).sort());
+      })
+      .catch(err => {
+        console.error('Error fetching history:', err);
+        setHistory([]);
+        setAvailableOSes([]);
+      })
       .finally(() => setLoading(false));
   };
+  
+  const handleFilterChange = (filterName, value) => {
+    const newFilters = { ...filters, [filterName]: value };
+    setFilters(newFilters);
+    
+    // If a host is selected, re-fetch with new filters
+    if (selectedHost) {
+      fetchHistory(selectedHost, newFilters);
+    }
+  };
+  
+  const clearFilters = () => {
+    const emptyFilters = {
+      dateFrom: '',
+      dateTo: '',
+      os: '',
+      package: ''
+    };
+    setFilters(emptyFilters);
+    
+    // If a host is selected, re-fetch without filters
+    if (selectedHost) {
+      fetchHistory(selectedHost, emptyFilters);
+    }
+  };
+  
+  const hasActiveFilters = filters.dateFrom || filters.dateTo || filters.os || filters.package;
 
   return (
     <>
@@ -169,7 +238,17 @@ function App() {
                 <ListItemButton
                   key={host}
                   selected={selectedHost === host}
-                  onClick={() => fetchHistory(host)}
+                  onClick={() => {
+                    // Clear filters when switching hosts
+                    const emptyFilters = {
+                      dateFrom: '',
+                      dateTo: '',
+                      os: '',
+                      package: ''
+                    };
+                    setFilters(emptyFilters);
+                    fetchHistory(host, emptyFilters);
+                  }}
                 >
                   <ListItemText primary={host} />
                 </ListItemButton>
@@ -182,39 +261,130 @@ function App() {
                 <Typography variant="h6" gutterBottom>
                   Update History for <b>{selectedHost}</b>
                 </Typography>
+                
+                {/* Filter Controls */}
+                <Paper elevation={1} sx={{ p: 2, mb: 2, backgroundColor: 'background.default' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <FilterListIcon sx={{ mr: 1 }} />
+                    <Typography variant="h6">Filters</Typography>
+                    {hasActiveFilters && (
+                      <Chip 
+                        label="Active" 
+                        color="primary" 
+                        size="small" 
+                        sx={{ ml: 1 }}
+                      />
+                    )}
+                  </Box>
+                  
+                  <Stack spacing={2}>
+                    <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                      <TextField
+                        label="From Date"
+                        type="date"
+                        value={filters.dateFrom}
+                        onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                        size="small"
+                        sx={{ minWidth: 150 }}
+                      />
+                      
+                      <TextField
+                        label="To Date"
+                        type="date"
+                        value={filters.dateTo}
+                        onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                        size="small"
+                        sx={{ minWidth: 150 }}
+                      />
+                      
+                      <FormControl size="small" sx={{ minWidth: 200 }}>
+                        <InputLabel>Operating System</InputLabel>
+                        <Select
+                          value={filters.os}
+                          label="Operating System"
+                          onChange={(e) => handleFilterChange('os', e.target.value)}
+                        >
+                          <MenuItem value="">
+                            <em>All</em>
+                          </MenuItem>
+                          {availableOSes.map((os) => (
+                            <MenuItem key={os} value={os}>
+                              {os}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      
+                      <TextField
+                        label="Package Name"
+                        value={filters.package}
+                        onChange={(e) => handleFilterChange('package', e.target.value)}
+                        size="small"
+                        placeholder="Search packages..."
+                        sx={{ minWidth: 200 }}
+                      />
+                    </Stack>
+                    
+                    <Box>
+                      <Button
+                        variant="outlined"
+                        startIcon={<ClearIcon />}
+                        onClick={clearFilters}
+                        disabled={!hasActiveFilters}
+                        size="small"
+                      >
+                        Clear Filters
+                      </Button>
+                    </Box>
+                  </Stack>
+                </Paper>
+                
                 {loading ? (
                   <CircularProgress />
                 ) : (
                   <>
                     {history.length === 0 ? (
                       <Typography variant="body2">
-                        No update history found for this host.
+                        {hasActiveFilters 
+                          ? "No update history found matching the current filters."
+                          : "No update history found for this host."
+                        }
                       </Typography>
                     ) : (
-                      <TableContainer component={Paper}>
-                        <Table size="small">
-                          <TableHead>
-                            <TableRow>
-                              <TableCell>Date</TableCell>
-                              <TableCell>OS</TableCell>
-                              <TableCell>Package</TableCell>
-                              <TableCell>Old Version</TableCell>
-                              <TableCell>New Version</TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {history.map((rec, i) => (
-                              <TableRow key={i}>
-                                <TableCell>{rec.update_date}</TableCell>
-                                <TableCell>{rec.os}</TableCell>
-                                <TableCell>{rec.name}</TableCell>
-                                <TableCell>{rec.old_version}</TableCell>
-                                <TableCell>{rec.new_version}</TableCell>
+                      <>
+                        <Box sx={{ mb: 1 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Showing {history.length} update{history.length !== 1 ? 's' : ''}
+                            {hasActiveFilters && ' (filtered)'}
+                          </Typography>
+                        </Box>
+                        <TableContainer component={Paper}>
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Date</TableCell>
+                                <TableCell>OS</TableCell>
+                                <TableCell>Package</TableCell>
+                                <TableCell>Old Version</TableCell>
+                                <TableCell>New Version</TableCell>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
+                            </TableHead>
+                            <TableBody>
+                              {history.map((rec, i) => (
+                                <TableRow key={i}>
+                                  <TableCell>{rec.update_date}</TableCell>
+                                  <TableCell>{rec.os}</TableCell>
+                                  <TableCell>{rec.name}</TableCell>
+                                  <TableCell>{rec.old_version}</TableCell>
+                                  <TableCell>{rec.new_version}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </>
                     )}
                   </>
                 )}
