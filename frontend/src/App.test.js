@@ -192,4 +192,216 @@ describe('App', () => {
     // Should be checked (dark mode) based on localStorage
     expect(darkModeSwitch).toBeChecked();
   });
+
+  it('renders filter controls when host is selected', async () => {
+    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
+    axios.get.mockResolvedValueOnce({ data: [
+      {
+        update_date: '2025-06-07',
+        os: 'Ubuntu',
+        name: 'nginx',
+        old_version: '1.18.0',
+        new_version: '1.20.0',
+      },
+    ] });
+    
+    await act(async () => {
+      render(<App />);
+    });
+    
+    await act(async () => {
+      fireEvent.click(await screen.findByText('host1'));
+    });
+    
+    // Check for filter controls
+    expect(await screen.findByText('Filters')).toBeInTheDocument();
+    expect(screen.getByLabelText('From Date')).toBeInTheDocument();
+    expect(screen.getByLabelText('To Date')).toBeInTheDocument();
+    expect(screen.getAllByText('Operating System')[0]).toBeInTheDocument(); // Select first instance
+    expect(screen.getByLabelText('Package Name')).toBeInTheDocument();
+    expect(screen.getByText('Clear Filters')).toBeInTheDocument();
+  });
+
+  it('applies date filters when changed', async () => {
+    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
+    // First call for initial load
+    axios.get.mockResolvedValueOnce({ data: [
+      {
+        update_date: '2025-06-07',
+        os: 'Ubuntu',
+        name: 'nginx',
+        old_version: '1.18.0',
+        new_version: '1.20.0',
+      },
+    ] });
+    // Second call with date filter
+    axios.get.mockResolvedValueOnce({ data: [] });
+    
+    await act(async () => {
+      render(<App />);
+    });
+    
+    await act(async () => {
+      fireEvent.click(await screen.findByText('host1'));
+    });
+    
+    // Wait for initial load
+    await waitFor(() => expect(screen.getByText('nginx')).toBeInTheDocument());
+    
+    // Apply date filter
+    const fromDateInput = screen.getByLabelText('From Date');
+    await act(async () => {
+      fireEvent.change(fromDateInput, { target: { value: '2025-06-08' } });
+    });
+    
+    // Check that the API was called with the filter parameter
+    await waitFor(() => {
+      const lastCall = axios.get.mock.calls[axios.get.mock.calls.length - 1];
+      expect(lastCall[0]).toContain('date_from=2025-06-08');
+    });
+  });
+
+  it('applies package name filter when changed', async () => {
+    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
+    // First call for initial load
+    axios.get.mockResolvedValueOnce({ data: [
+      {
+        update_date: '2025-06-07',
+        os: 'Ubuntu',
+        name: 'nginx',
+        old_version: '1.18.0',
+        new_version: '1.20.0',
+      },
+    ] });
+    // Second call with package filter
+    axios.get.mockResolvedValueOnce({ data: [] });
+    
+    await act(async () => {
+      render(<App />);
+    });
+    
+    await act(async () => {
+      fireEvent.click(await screen.findByText('host1'));
+    });
+    
+    // Wait for initial load
+    await waitFor(() => expect(screen.getByText('nginx')).toBeInTheDocument());
+    
+    // Apply package filter
+    const packageInput = screen.getByLabelText('Package Name');
+    await act(async () => {
+      fireEvent.change(packageInput, { target: { value: 'apache' } });
+    });
+    
+    // Check that the API was called with the filter parameter
+    await waitFor(() => {
+      const lastCall = axios.get.mock.calls[axios.get.mock.calls.length - 1];
+      expect(lastCall[0]).toContain('package=apache');
+    });
+  });
+
+  it('clears all filters when clear button is clicked', async () => {
+    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
+    // First call for initial load
+    axios.get.mockResolvedValueOnce({ data: [
+      {
+        update_date: '2025-06-07',
+        os: 'Ubuntu',
+        name: 'nginx',
+        old_version: '1.18.0',
+        new_version: '1.20.0',
+      },
+    ] });
+    // Second call with package filter
+    axios.get.mockResolvedValueOnce({ data: [] });
+    // Third call after clearing filters
+    axios.get.mockResolvedValueOnce({ data: [
+      {
+        update_date: '2025-06-07',
+        os: 'Ubuntu',
+        name: 'nginx',
+        old_version: '1.18.0',
+        new_version: '1.20.0',
+      },
+    ] });
+    
+    await act(async () => {
+      render(<App />);
+    });
+    
+    await act(async () => {
+      fireEvent.click(await screen.findByText('host1'));
+    });
+    
+    // Wait for initial load
+    await waitFor(() => expect(screen.getByText('nginx')).toBeInTheDocument());
+    
+    // Apply package filter
+    const packageInput = screen.getByLabelText('Package Name');
+    await act(async () => {
+      fireEvent.change(packageInput, { target: { value: 'apache' } });
+    });
+    
+    // Clear filters
+    const clearButton = screen.getByText('Clear Filters');
+    await act(async () => {
+      fireEvent.click(clearButton);
+    });
+    
+    // Check that filters are cleared
+    expect(packageInput.value).toBe('');
+    
+    // Check that the API was called without filter parameters
+    await waitFor(() => {
+      const lastCall = axios.get.mock.calls[axios.get.mock.calls.length - 1];
+      expect(lastCall[0]).toBe('/api/history/host1');
+    });
+  });
+
+  it('shows filtered message when filters are active', async () => {
+    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
+    // First call for initial load
+    axios.get.mockResolvedValueOnce({ data: [
+      {
+        update_date: '2025-06-07',
+        os: 'Ubuntu',
+        name: 'nginx',
+        old_version: '1.18.0',
+        new_version: '1.20.0',
+      },
+    ] });
+    // Second call with filter
+    axios.get.mockResolvedValueOnce({ data: [
+      {
+        update_date: '2025-06-07',
+        os: 'Ubuntu',
+        name: 'nginx',
+        old_version: '1.18.0',
+        new_version: '1.20.0',
+      },
+    ] });
+    
+    await act(async () => {
+      render(<App />);
+    });
+    
+    await act(async () => {
+      fireEvent.click(await screen.findByText('host1'));
+    });
+    
+    // Wait for initial load
+    await waitFor(() => expect(screen.getByText('nginx')).toBeInTheDocument());
+    
+    // Apply package filter
+    const packageInput = screen.getByLabelText('Package Name');
+    await act(async () => {
+      fireEvent.change(packageInput, { target: { value: 'nginx' } });
+    });
+    
+    // Check for active filter indicator and filtered results message
+    await waitFor(() => {
+      expect(screen.getByText('Active')).toBeInTheDocument();
+      expect(screen.getByText('Showing 1 update (filtered)')).toBeInTheDocument();
+    });
+  });
 });

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlmodel import SQLModel, Field, Session, create_engine, select
@@ -347,8 +347,15 @@ def list_hosts(session: Session = Depends(get_session)):
         )
 
 @app.get("/history/{hostname}", response_model=List[PackageUpdate])
-def host_history(hostname: str, session: Session = Depends(get_session)):
-    """Get update history for a specific host."""
+def host_history(
+    hostname: str, 
+    session: Session = Depends(get_session),
+    date_from: Optional[date] = Query(None, description="Filter updates from this date (inclusive)"),
+    date_to: Optional[date] = Query(None, description="Filter updates to this date (inclusive)"),
+    os: Optional[str] = Query(None, description="Filter by operating system"),
+    package: Optional[str] = Query(None, description="Filter by package name (partial match)")
+):
+    """Get update history for a specific host with optional filters."""
     try:
         if not validate_hostname(hostname):
             raise HTTPException(
@@ -356,11 +363,44 @@ def host_history(hostname: str, session: Session = Depends(get_session)):
                 detail="Invalid hostname format"
             )
         
-        result = session.exec(
-            select(PackageUpdate)
-            .where(PackageUpdate.hostname == hostname)
-            .order_by(PackageUpdate.update_date.desc(), PackageUpdate.id.desc())
-        ).all()
+        # Validate filter parameters
+        if os and not validate_os(os):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid OS format"
+            )
+        
+        if package and not validate_package_name(package):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid package name format"
+            )
+        
+        if date_from and date_to and date_from > date_to:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="date_from cannot be after date_to"
+            )
+        
+        # Build query with filters
+        query = select(PackageUpdate).where(PackageUpdate.hostname == hostname)
+        
+        if date_from:
+            query = query.where(PackageUpdate.update_date >= date_from)
+        
+        if date_to:
+            query = query.where(PackageUpdate.update_date <= date_to)
+        
+        if os:
+            query = query.where(PackageUpdate.os == os)
+        
+        if package:
+            # Use SQL LIKE for partial matching (case-insensitive)
+            query = query.where(PackageUpdate.name.ilike(f"%{package}%"))
+        
+        query = query.order_by(PackageUpdate.update_date.desc(), PackageUpdate.id.desc())
+        
+        result = session.exec(query).all()
         
         if not result:
             raise HTTPException(
