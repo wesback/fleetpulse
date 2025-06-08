@@ -31,6 +31,17 @@ import {
   Button,
   Chip,
   Stack,
+  Fab,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Card,
+  CardContent,
+  Alert,
+  Collapse,
+  Divider,
 } from '@mui/material';
 import StorageIcon from '@mui/icons-material/Storage';
 import DnsIcon from '@mui/icons-material/Dns';
@@ -38,6 +49,11 @@ import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ClearIcon from '@mui/icons-material/Clear';
+import ChatIcon from '@mui/icons-material/Chat';
+import SendIcon from '@mui/icons-material/Send';
+import CloseIcon from '@mui/icons-material/Close';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 
 const API_BASE = '/api';
 
@@ -130,6 +146,12 @@ function App() {
   // Available OS options for dropdown (populated from data)
   const [availableOSes, setAvailableOSes] = useState([]);
 
+  // Chat state
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+
   useEffect(() => {
     axios.get(`${API_BASE}/hosts`)
       .then(res => setHosts(Array.isArray(res.data.hosts) ? res.data.hosts : []))
@@ -193,7 +215,217 @@ function App() {
     }
   };
   
+  // Chat functions
+  const sendChatMessage = async () => {
+    if (!chatInput.trim()) return;
+    
+    const userMessage = { type: 'user', text: chatInput };
+    setChatMessages(prev => [...prev, userMessage]);
+    setChatLoading(true);
+    
+    try {
+      const response = await axios.post(`${API_BASE}/chat`, {
+        question: chatInput
+      });
+      
+      const botMessage = {
+        type: 'bot',
+        text: response.data.answer,
+        data: response.data.data,
+        queryType: response.data.query_type
+      };
+      
+      setChatMessages(prev => [...prev, botMessage]);
+    } catch (error) {
+      console.error('Error sending chat message:', error);
+      const errorMessage = {
+        type: 'bot',
+        text: 'Sorry, I encountered an error processing your question. Please try again.',
+        queryType: 'error'
+      };
+      setChatMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setChatLoading(false);
+      setChatInput('');
+    }
+  };
+  
+  const handleChatKeyPress = (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      sendChatMessage();
+    }
+  };
+  
+  const clearChatHistory = () => {
+    setChatMessages([]);
+  };
+  
   const hasActiveFilters = filters.dateFrom || filters.dateTo || filters.os || filters.package;
+
+  // Chat component
+  const ChatComponent = () => (
+    <Dialog
+      open={chatOpen}
+      onClose={() => setChatOpen(false)}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: { height: '70vh', maxHeight: 600 }
+      }}
+    >
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <ChatIcon sx={{ mr: 1 }} />
+          FleetPulse Chat Assistant
+        </Box>
+        <IconButton onClick={() => setChatOpen(false)} size="small">
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
+      
+      <DialogContent sx={{ display: 'flex', flexDirection: 'column', p: 0 }}>
+        {/* Chat messages area */}
+        <Box sx={{ flexGrow: 1, p: 2, overflow: 'auto', bgcolor: mode === 'dark' ? 'grey.900' : 'grey.50' }}>
+          {chatMessages.length === 0 && (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <ChatIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                Welcome to FleetPulse Chat!
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Ask me questions about your package updates. Try:
+              </Typography>
+              <Box sx={{ mt: 2, textAlign: 'left', maxWidth: 400, mx: 'auto' }}>
+                {[
+                  "Which hosts had Python packages updated last week?",
+                  "What packages were updated on web-01?",
+                  "Show me Ubuntu hosts",
+                  "How many hosts do we have?"
+                ].map((example, i) => (
+                  <Button
+                    key={i}
+                    variant="outlined"
+                    size="small"
+                    sx={{ m: 0.5, fontSize: '0.75rem' }}
+                    onClick={() => setChatInput(example)}
+                  >
+                    {example}
+                  </Button>
+                ))}
+              </Box>
+            </Box>
+          )}
+          
+          {chatMessages.map((message, index) => (
+            <Box key={index} sx={{ mb: 2 }}>
+              {message.type === 'user' ? (
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+                  <Paper 
+                    sx={{ 
+                      p: 1.5, 
+                      maxWidth: '80%',
+                      bgcolor: 'primary.main',
+                      color: 'primary.contrastText'
+                    }}
+                  >
+                    <Typography variant="body2">{message.text}</Typography>
+                  </Paper>
+                </Box>
+              ) : (
+                <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 1 }}>
+                  <Paper 
+                    sx={{ 
+                      p: 1.5, 
+                      maxWidth: '80%',
+                      bgcolor: mode === 'dark' ? 'grey.700' : 'white'
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                      {message.text}
+                    </Typography>
+                    
+                    {/* Show structured data if available */}
+                    {message.data && Array.isArray(message.data) && message.data.length > 0 && (
+                      <Box sx={{ mt: 2 }}>
+                        <Divider sx={{ mb: 1 }} />
+                        <Typography variant="caption" color="text.secondary">
+                          Results ({message.data.length}):
+                        </Typography>
+                        <Box sx={{ mt: 1, maxHeight: 150, overflow: 'auto' }}>
+                          {message.data.slice(0, 10).map((item, i) => (
+                            <Chip
+                              key={i}
+                              label={
+                                item.hostname || 
+                                (item.package && `${item.package}: ${item.old_version} → ${item.new_version}`) ||
+                                JSON.stringify(item)
+                              }
+                              size="small"
+                              sx={{ m: 0.25 }}
+                            />
+                          ))}
+                          {message.data.length > 10 && (
+                            <Typography variant="caption" sx={{ display: 'block', mt: 1 }}>
+                              ... and {message.data.length - 10} more
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+                    )}
+                  </Paper>
+                </Box>
+              )}
+            </Box>
+          ))}
+          
+          {chatLoading && (
+            <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 1 }}>
+              <Paper sx={{ p: 1.5, bgcolor: mode === 'dark' ? 'grey.700' : 'white' }}>
+                <CircularProgress size={16} sx={{ mr: 1 }} />
+                <Typography variant="body2" component="span">
+                  Thinking...
+                </Typography>
+              </Paper>
+            </Box>
+          )}
+        </Box>
+      </DialogContent>
+      
+      <DialogActions sx={{ p: 2, pt: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1, width: '100%' }}>
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Ask about package updates..."
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            onKeyPress={handleChatKeyPress}
+            disabled={chatLoading}
+            size="small"
+          />
+          <Button
+            variant="contained"
+            onClick={sendChatMessage}
+            disabled={!chatInput.trim() || chatLoading}
+            sx={{ minWidth: 'auto', px: 2 }}
+          >
+            <SendIcon />
+          </Button>
+          {chatMessages.length > 0 && (
+            <Button
+              variant="outlined"
+              onClick={clearChatHistory}
+              size="small"
+              sx={{ minWidth: 'auto', px: 2 }}
+            >
+              Clear
+            </Button>
+          )}
+        </Box>
+      </DialogActions>
+    </Dialog>
+  );
 
   return (
     <>
@@ -400,6 +632,24 @@ function App() {
           </Box>
         </Box>
       </Container>
+
+      {/* Floating Chat Button */}
+      <Fab
+        color="primary"
+        aria-label="chat"
+        sx={{
+          position: 'fixed',
+          bottom: 20,
+          right: 20,
+          zIndex: 1000
+        }}
+        onClick={() => setChatOpen(true)}
+      >
+        <ChatIcon />
+      </Fab>
+
+      {/* Chat Component */}
+      <ChatComponent />
     </>
   );
 }

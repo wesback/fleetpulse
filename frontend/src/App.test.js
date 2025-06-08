@@ -404,4 +404,72 @@ describe('App', () => {
       expect(screen.getByText('Showing 1 update (filtered)')).toBeInTheDocument();
     });
   });
+
+  it('renders chat button and can open chat dialog', async () => {
+    axios.get.mockResolvedValueOnce({ data: { hosts: [] } });
+    
+    await act(async () => {
+      render(<App />);
+    });
+    
+    // Check that chat button is present
+    const chatButton = screen.getByLabelText('chat');
+    expect(chatButton).toBeInTheDocument();
+    
+    // Click chat button to open dialog
+    await act(async () => {
+      fireEvent.click(chatButton);
+    });
+    
+    // Check that chat dialog opens
+    expect(screen.getByText('FleetPulse Chat Assistant')).toBeInTheDocument();
+    expect(screen.getByText('Welcome to FleetPulse Chat!')).toBeInTheDocument();
+  });
+
+  it('sends chat message and displays response', async () => {
+    axios.get.mockResolvedValueOnce({ data: { hosts: [] } });
+    
+    // Mock chat API response
+    axios.post.mockResolvedValueOnce({
+      data: {
+        answer: 'We have 0 hosts total in the fleet.',
+        data: { count: 0 },
+        query_type: 'count_hosts'
+      }
+    });
+    
+    await act(async () => {
+      render(<App />);
+    });
+    
+    // Open chat dialog
+    const chatButton = screen.getByLabelText('chat');
+    await act(async () => {
+      fireEvent.click(chatButton);
+    });
+    
+    // Type a message
+    const chatInput = screen.getByPlaceholderText('Ask about package updates...');
+    await act(async () => {
+      fireEvent.change(chatInput, { target: { value: 'How many hosts do we have?' } });
+    });
+    
+    // Send message
+    const sendButton = screen.getByTestId('SendIcon').closest('button');
+    await act(async () => {
+      fireEvent.click(sendButton);
+    });
+    
+    // Check that the API was called
+    await waitFor(() => {
+      expect(axios.post).toHaveBeenCalledWith('/api/chat', {
+        question: 'How many hosts do we have?'
+      });
+    });
+    
+    // Check that response is displayed
+    await waitFor(() => {
+      expect(screen.getByText('We have 0 hosts total in the fleet.')).toBeInTheDocument();
+    });
+  });
 });
