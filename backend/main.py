@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from sqlmodel import SQLModel, Field, Session, create_engine, select
 from sqlalchemy import text
 from typing import List, Optional, Dict, Any
-from datetime import date
+from datetime import date, timedelta
 import os
 import logging
 from contextlib import asynccontextmanager
@@ -149,7 +149,322 @@ class ErrorResponse(SQLModel):
     error: str
     detail: Optional[str] = None
 
-@asynccontextmanager
+class ChatQuery(SQLModel):
+    """Model for natural language chat queries."""
+    question: str = Field(max_length=500, description="Natural language question about package updates")
+
+class ChatResponse(SQLModel):
+    """Model for chat response."""
+    answer: str = Field(description="Answer to the user's question")
+    data: Optional[List[Dict[str, Any]]] = Field(default=None, description="Structured data supporting the answer")
+    query_type: str = Field(description="Type of query that was processed")
+
+def parse_natural_language_query(question: str, session: Session) -> ChatResponse:
+    """Parse natural language questions and convert them to database queries."""
+    question_lower = question.lower().strip()
+    
+    # Pattern: "which hosts had [package] updated [timeframe]?"
+    if "which hosts" in question_lower and "updated" in question_lower:
+        return handle_hosts_updated_query(question_lower, session)
+    
+    # Pattern: "what packages were updated on [hostname]?"
+    elif "what packages" in question_lower and "updated" in question_lower:
+        return handle_packages_on_host_query(question_lower, session)
+    
+    # Pattern: "show me [os] hosts" or "list [os] hosts"
+    elif ("show me" in question_lower or "list" in question_lower) and "hosts" in question_lower:
+        return handle_os_hosts_query(question_lower, session)
+    
+    # Pattern: "which hosts haven't been updated" or "hosts not updated"
+    elif ("haven't been updated" in question_lower or "not updated" in question_lower) and "hosts" in question_lower:
+        return handle_stale_hosts_query(question_lower, session)
+    
+    # Pattern: "how many hosts" or "count hosts"
+    elif ("how many" in question_lower or "count" in question_lower) and "hosts" in question_lower:
+        return handle_count_hosts_query(question_lower, session)
+    
+    else:
+        return ChatResponse(
+            answer="I can help you with questions about package updates. Try asking:\n"
+                   "• 'Which hosts had Python packages updated last week?'\n"
+                   "• 'What packages were updated on host-01?'\n"
+                   "• 'Show me Ubuntu hosts'\n"
+                   "• 'Which hosts haven't been updated in 30 days?'\n"
+                   "• 'How many hosts do we have?'",
+            query_type="help"
+        )
+
+def extract_timeframe(text: str) -> Optional[date]:
+    """Extract timeframe from natural language text."""
+    today = date.today()
+    
+    if "last week" in text or "past week" in text:
+        return today - timedelta(days=7)
+    elif "last month" in text or "past month" in text:
+        return today - timedelta(days=30)
+    elif "yesterday" in text:
+        return today - timedelta(days=1)
+    elif "last 3 days" in text or "past 3 days" in text:
+        return today - timedelta(days=3)
+    elif "last 7 days" in text or "past 7 days" in text:
+        return today - timedelta(days=7)
+    elif "last 30 days" in text or "past 30 days" in text:
+        return today - timedelta(days=30)
+    
+    # Try to extract number of days
+    import re
+    day_match = re.search(r'(\d+)\s+days?', text)
+    if day_match:
+        days = int(day_match.group(1))
+        return today - timedelta(days=days)
+    
+    return None
+
+def extract_package_name(text: str) -> Optional[str]:
+    """Extract package name from natural language text."""
+    # Common package names to look for
+    packages = ["python", "nginx", "apache", "mysql", "postgresql", "docker", "nodejs", "java", "php", "redis"]
+    
+    for package in packages:
+        if package in text:
+            return package
+    
+    # Try to extract words that might be package names (between common words)
+    words = text.split()
+    skip_words = {"which", "hosts", "had", "updated", "packages", "the", "a", "an", "in", "on", "at", "last", "past", "week", "month", "day", "days"}
+    
+    for word in words:
+        clean_word = word.strip("?.,!").lower()
+        if len(clean_word) > 2 and clean_word not in skip_words:
+            return clean_word
+    
+    return None
+
+def extract_hostname(text: str) -> Optional[str]:
+    """Extract hostname from natural language text."""
+    # Look for words that end with numbers (common hostname pattern)
+    import re
+    hostname_pattern = r'\b([a-zA-Z][-a-zA-Z0-9]*\d+|host[-\w]*\d*)\b'
+    match = re.search(hostname_pattern, text)
+    if match:
+        return match.group(1)
+    
+    # Look for words after "on" 
+    words = text.split()
+    for i, word in enumerate(words):
+        if word.lower() == "on" and i + 1 < len(words):
+            hostname = words[i + 1].strip("?.,!")
+            if len(hostname) > 0:
+                return hostname
+    
+    return None
+
+def extract_os_name(text: str) -> Optional[str]:
+    """Extract OS name from natural language text."""
+    os_names = ["ubuntu", "debian", "centos", "rhel", "fedora", "arch", "archlinux", "alpine", "opensuse", "windows", "macos"]
+    
+    for os_name in os_names:
+        if os_name in text.lower():
+            return os_name
+    
+    return None
+
+def handle_hosts_updated_query(question: str, session: Session) -> ChatResponse:
+    """Handle queries about which hosts had packages updated."""
+    package_name = extract_package_name(question)
+    timeframe = extract_timeframe(question)
+    
+    query = select(PackageUpdate.hostname).distinct()
+    
+    if package_name:
+        query = query.where(PackageUpdate.name.ilike(f"%{package_name}%"))
+    
+    if timeframe:
+        query = query.where(PackageUpdate.update_date >= timeframe)
+    
+    try:
+        result = session.exec(query).all()
+        
+        if not result:
+            answer = f"No hosts found"
+            if package_name:
+                answer += f" with {package_name} packages"
+            if timeframe:
+                answer += f" updated since {timeframe}"
+            answer += "."
+        else:
+            answer = f"Found {len(result)} host(s)"
+            if package_name:
+                answer += f" with {package_name} packages"
+            if timeframe:
+                answer += f" updated since {timeframe}"
+            answer += f": {', '.join(result)}"
+        
+        return ChatResponse(
+            answer=answer,
+            data=[{"hostname": host} for host in result],
+            query_type="hosts_updated"
+        )
+    except Exception as e:
+        logger.error(f"Error in hosts updated query: {e}")
+        return ChatResponse(
+            answer="Sorry, I encountered an error while searching for hosts.",
+            query_type="error"
+        )
+
+def handle_packages_on_host_query(question: str, session: Session) -> ChatResponse:
+    """Handle queries about packages updated on a specific host."""
+    hostname = extract_hostname(question)
+    timeframe = extract_timeframe(question)
+    
+    if not hostname:
+        return ChatResponse(
+            answer="Please specify which host you'd like to know about. For example: 'What packages were updated on host-01?'",
+            query_type="clarification"
+        )
+    
+    query = select(PackageUpdate).where(PackageUpdate.hostname == hostname)
+    
+    if timeframe:
+        query = query.where(PackageUpdate.update_date >= timeframe)
+    
+    query = query.order_by(PackageUpdate.update_date.desc())
+    
+    try:
+        result = session.exec(query).all()
+        
+        if not result:
+            answer = f"No package updates found for host '{hostname}'"
+            if timeframe:
+                answer += f" since {timeframe}"
+            answer += "."
+        else:
+            packages = [f"{r.name} ({r.old_version} → {r.new_version})" for r in result[:10]]
+            answer = f"Found {len(result)} package update(s) for host '{hostname}'"
+            if timeframe:
+                answer += f" since {timeframe}"
+            if len(result) > 10:
+                answer += f". Here are the most recent 10: {', '.join(packages)}"
+            else:
+                answer += f": {', '.join(packages)}"
+        
+        return ChatResponse(
+            answer=answer,
+            data=[{
+                "package": r.name,
+                "old_version": r.old_version,
+                "new_version": r.new_version,
+                "update_date": str(r.update_date),
+                "os": r.os
+            } for r in result],
+            query_type="packages_on_host"
+        )
+    except Exception as e:
+        logger.error(f"Error in packages on host query: {e}")
+        return ChatResponse(
+            answer="Sorry, I encountered an error while searching for package updates.",
+            query_type="error"
+        )
+
+def handle_os_hosts_query(question: str, session: Session) -> ChatResponse:
+    """Handle queries about hosts with specific OS."""
+    os_name = extract_os_name(question)
+    
+    query = select(PackageUpdate.hostname, PackageUpdate.os).distinct()
+    
+    if os_name:
+        query = query.where(PackageUpdate.os.ilike(f"%{os_name}%"))
+    
+    try:
+        result = session.exec(query).all()
+        
+        if not result:
+            answer = f"No hosts found"
+            if os_name:
+                answer += f" running {os_name}"
+            answer += "."
+        else:
+            if os_name:
+                answer = f"Found {len(result)} host(s) running {os_name}: "
+            else:
+                answer = f"Found {len(result)} host(s) with these operating systems: "
+            
+            host_list = [f"{r[0]} ({r[1]})" for r in result]
+            answer += ", ".join(host_list)
+        
+        return ChatResponse(
+            answer=answer,
+            data=[{"hostname": r[0], "os": r[1]} for r in result],
+            query_type="os_hosts"
+        )
+    except Exception as e:
+        logger.error(f"Error in OS hosts query: {e}")
+        return ChatResponse(
+            answer="Sorry, I encountered an error while searching for hosts.",
+            query_type="error"
+        )
+
+def handle_stale_hosts_query(question: str, session: Session) -> ChatResponse:
+    """Handle queries about hosts that haven't been updated recently."""
+    timeframe = extract_timeframe(question)
+    
+    if not timeframe:
+        timeframe = date.today() - timedelta(days=30)  # Default to 30 days
+    
+    try:
+        # Get all hosts and their last update dates
+        recent_hosts = session.exec(
+            select(PackageUpdate.hostname).distinct()
+            .where(PackageUpdate.update_date >= timeframe)
+        ).all()
+        
+        all_hosts = session.exec(select(PackageUpdate.hostname).distinct()).all()
+        
+        stale_hosts = [host for host in all_hosts if host not in recent_hosts]
+        
+        if not stale_hosts:
+            answer = f"All hosts have been updated since {timeframe}."
+        else:
+            answer = f"Found {len(stale_hosts)} host(s) that haven't been updated since {timeframe}: {', '.join(stale_hosts)}"
+        
+        return ChatResponse(
+            answer=answer,
+            data=[{"hostname": host, "status": "stale"} for host in stale_hosts],
+            query_type="stale_hosts"
+        )
+    except Exception as e:
+        logger.error(f"Error in stale hosts query: {e}")
+        return ChatResponse(
+            answer="Sorry, I encountered an error while searching for stale hosts.",
+            query_type="error"
+        )
+
+def handle_count_hosts_query(question: str, session: Session) -> ChatResponse:
+    """Handle queries about counting hosts."""
+    os_name = extract_os_name(question)
+    
+    try:
+        if os_name:
+            count = session.exec(
+                select(PackageUpdate.hostname).distinct()
+                .where(PackageUpdate.os.ilike(f"%{os_name}%"))
+            ).all()
+            answer = f"We have {len(count)} host(s) running {os_name}."
+        else:
+            count = session.exec(select(PackageUpdate.hostname).distinct()).all()
+            answer = f"We have {len(count)} host(s) total in the fleet."
+        
+        return ChatResponse(
+            answer=answer,
+            data={"count": len(count)},
+            query_type="count_hosts"
+        )
+    except Exception as e:
+        logger.error(f"Error in count hosts query: {e}")
+        return ChatResponse(
+            answer="Sorry, I encountered an error while counting hosts.",
+            query_type="error"
+        )
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup and shutdown events."""
     # Startup
@@ -462,6 +777,37 @@ def health_check():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Service unhealthy"
+        )
+
+@app.post("/chat", response_model=ChatResponse)
+def chat_query(chat: ChatQuery, session: Session = Depends(get_session)):
+    """Process natural language queries about package updates."""
+    try:
+        if not chat.question or len(chat.question.strip()) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Question cannot be empty"
+            )
+        
+        # Basic sanitization
+        if len(chat.question) > 500:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Question too long (max 500 characters)"
+            )
+        
+        response = parse_natural_language_query(chat.question, session)
+        logger.info(f"Processed chat query: '{chat.question}' -> {response.query_type}")
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing chat query: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to process query"
         )
 
 if __name__ == "__main__":
