@@ -207,7 +207,7 @@ Add the relevant Ansible snippet to your playbooks and your updates will appear 
         "update_date": "{{ pacman_log_start.stdout[1:11] }}",
         "updated_packages": {{ updated_packages_json.stdout | default('[]') | from_json }}
       }
-    status_code: 200
+    status_code: [200, 201]
   when: updated_packages_json.stdout != "[]"
 ```
 
