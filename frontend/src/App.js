@@ -111,7 +111,8 @@ function App() {
 
   useEffect(() => {
     axios.get(`${API_BASE}/hosts`)
-      .then(res => setHosts(res.data.hosts));
+      .then(res => setHosts(Array.isArray(res.data.hosts) ? res.data.hosts : []))
+      .catch(() => setHosts([])); // Defensive: always set to array
   }, []);
 
   const fetchHistory = (host) => {
