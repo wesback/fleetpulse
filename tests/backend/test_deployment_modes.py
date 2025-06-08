@@ -7,7 +7,7 @@ import pytest
 
 def test_dockerfile_deployment_mode_configuration():
     """Test that the Dockerfile properly supports both deployment modes."""
-    dockerfile_path = "/home/runner/work/fleetpulse/fleetpulse/Dockerfile"
+    dockerfile_path = os.path.join(os.path.dirname(__file__), '..', '..', 'Dockerfile.backend')
     
     # Read the Dockerfile content
     with open(dockerfile_path, 'r') as f:
@@ -24,7 +24,7 @@ def test_dockerfile_deployment_mode_configuration():
 
 def test_env_example_deployment_mode_documentation():
     """Test that .env.example documents the new deployment mode options."""
-    env_example_path = "/home/runner/work/fleetpulse/fleetpulse/.env.example"
+    env_example_path = os.path.join(os.path.dirname(__file__), '..', '..', '.env.example')
     
     with open(env_example_path, 'r') as f:
         env_content = f.read()
@@ -71,7 +71,7 @@ def test_gunicorn_command_structure():
 
 def test_deployment_mode_defaults():
     """Test that the deployment mode defaults to uvicorn for simplicity."""
-    dockerfile_path = "/home/runner/work/fleetpulse/fleetpulse/Dockerfile"
+    dockerfile_path = os.path.join(os.path.dirname(__file__), '..', '..', 'Dockerfile.backend')
     
     with open(dockerfile_path, 'r') as f:
         dockerfile_content = f.read()
@@ -81,7 +81,7 @@ def test_deployment_mode_defaults():
 
 def test_environment_configuration_examples():
     """Test that the configuration examples make sense for different use cases."""
-    env_example_path = "/home/runner/work/fleetpulse/fleetpulse/.env.example"
+    env_example_path = os.path.join(os.path.dirname(__file__), '..', '..', '.env.example')
     
     with open(env_example_path, 'r') as f:
         env_content = f.read()
@@ -100,7 +100,7 @@ def test_environment_configuration_examples():
 def test_backward_compatibility():
     """Test that the new configuration maintains backward compatibility."""
     # The GUNICORN_WORKERS variable should still work for gunicorn mode
-    env_example_path = "/home/runner/work/fleetpulse/fleetpulse/.env.example"
+    env_example_path = os.path.join(os.path.dirname(__file__), '..', '..', '.env.example')
     
     with open(env_example_path, 'r') as f:
         env_content = f.read()

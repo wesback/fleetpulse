@@ -23,7 +23,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: frontend/Dockerfile
+      dockerfile: Dockerfile.frontend
     container_name: fleetpulse-frontend
     ports:
       - "8080:80"  # Frontend UI

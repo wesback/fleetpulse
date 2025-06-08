@@ -11,7 +11,8 @@ from unittest.mock import patch
 def test_docker_worker_count_configuration():
     """Test that the Dockerfile correctly uses the GUNICORN_WORKERS environment variable."""
     # Read the Dockerfile
-    with open('/home/runner/work/fleetpulse/fleetpulse/Dockerfile', 'r') as f:
+    dockerfile_path = os.path.join(os.path.dirname(__file__), '..', '..', 'Dockerfile.backend')
+    with open(dockerfile_path, 'r') as f:
         dockerfile_content = f.read()
     
     # Verify that the CMD uses the environment variable with default
@@ -23,7 +24,8 @@ def test_docker_worker_count_configuration():
 def test_environment_variables_documented():
     """Test that new environment variables are documented."""
     # Read the .env.example file
-    with open('/home/runner/work/fleetpulse/fleetpulse/.env.example', 'r') as f:
+    env_example_path = os.path.join(os.path.dirname(__file__), '..', '..', '.env.example')
+    with open(env_example_path, 'r') as f:
         env_example_content = f.read()
     
     # Verify that new environment variables are documented
