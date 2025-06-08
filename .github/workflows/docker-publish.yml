@@ -69,7 +69,7 @@ jobs:
       - name: Build and push frontend image
         uses: docker/build-push-action@v5
         with:
-          context: ./frontend
-          file: frontend/Dockerfile
+          context: .
+          file: Dockerfile.frontend
           push: true
           tags: wesback/fleetpulse-frontend:latest
