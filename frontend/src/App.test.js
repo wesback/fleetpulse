@@ -2,12 +2,8 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import axios from 'axios';
 import App from './App';
-import * as telemetry from './telemetry';
 
 jest.mock('axios');
-
-// Mock telemetry module completely to avoid OpenTelemetry dependency issues in tests
-jest.mock('./telemetry');
 
 // Mock matchMedia for useMediaQuery
 Object.defineProperty(window, 'matchMedia', {
@@ -28,22 +24,6 @@ describe('App', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
-    
-    // Set up telemetry mocks
-    const mockSpan = {
-      setAttributes: jest.fn(),
-      addEvent: jest.fn(),
-      setStatus: jest.fn(),
-      end: jest.fn(),
-    };
-    
-    telemetry.initializeTelemetry.mockImplementation(() => {});
-    telemetry.trackUserFlow.mockReturnValue(mockSpan);
-    telemetry.trackApiCall.mockReturnValue(mockSpan);
-    telemetry.trackComponentRender.mockReturnValue(mockSpan);
-    telemetry.trackError.mockImplementation(() => {});
-    telemetry.isTelemetryEnabled.mockReturnValue(false);
-    telemetry.getTelemetryStatus.mockReturnValue({ enabled: false, initialized: false });
   });
 
   it('renders hosts list and handles empty state', async () => {
