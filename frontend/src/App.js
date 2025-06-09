@@ -39,6 +39,17 @@ import Brightness7Icon from '@mui/icons-material/Brightness7';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ClearIcon from '@mui/icons-material/Clear';
 
+// Import telemetry
+import {
+  initializeTelemetry,
+  trackUserFlow,
+  trackApiCall,
+  trackComponentRender,
+  trackError,
+  isTelemetryEnabled,
+  getTelemetryStatus,
+} from './telemetry';
+
 const API_BASE = '/api';
 
 // Theme Context
@@ -130,16 +141,52 @@ function App() {
   // Available OS options for dropdown (populated from data)
   const [availableOSes, setAvailableOSes] = useState([]);
 
+  // Initialize telemetry on app startup
   useEffect(() => {
+    try {
+      initializeTelemetry();
+      console.log('Telemetry initialized for FleetPulse frontend');
+    } catch (error) {
+      console.error('Failed to initialize telemetry:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    const span = trackUserFlow('app_initialization', 'fetch_hosts', {
+      'hosts.count': 0,
+    });
+    
     axios.get(`${API_BASE}/hosts`)
-      .then(res => setHosts(Array.isArray(res.data.hosts) ? res.data.hosts : []))
+      .then(res => {
+        const hostsData = Array.isArray(res.data.hosts) ? res.data.hosts : [];
+        setHosts(hostsData);
+        span.setAttributes({
+          'hosts.count': hostsData.length,
+          'operation.success': true,
+        });
+        span.end();
+      })
       .catch((err) => {
         console.error('Error fetching hosts:', err);
         setHosts([]); // Defensive: always set to array
+        trackError(err, {
+          'operation': 'fetch_hosts',
+          'api.endpoint': `${API_BASE}/hosts`,
+        });
+        span.setAttributes({
+          'operation.success': false,
+          'error.message': err.message,
+        });
+        span.end();
       });
   }, []);
 
   const fetchHistory = (host, currentFilters = filters) => {
+    const span = trackUserFlow('host_selection', 'fetch_history', {
+      'host.name': host,
+      'filters.applied': Object.values(currentFilters).some(v => v),
+    });
+    
     setLoading(true);
     setSelectedHost(host);
     
@@ -153,22 +200,62 @@ function App() {
     const queryString = params.toString();
     const url = `${API_BASE}/history/${host}${queryString ? `?${queryString}` : ''}`;
     
+    const apiSpan = trackApiCall('GET', url, {
+      'host.name': host,
+      'query.params': queryString,
+    });
+    
     axios.get(url)
       .then(res => {
         setHistory(res.data);
         // Extract unique OS values for dropdown
         const osSet = new Set(res.data.map(item => item.os));
         setAvailableOSes(Array.from(osSet).sort());
+        
+        span.setAttributes({
+          'operation.success': true,
+          'history.count': res.data.length,
+          'os.count': osSet.size,
+        });
+        apiSpan.setAttributes({
+          'operation.success': true,
+          'response.count': res.data.length,
+        });
+        span.end();
+        apiSpan.end();
       })
       .catch(err => {
         console.error('Error fetching history:', err);
         setHistory([]);
         setAvailableOSes([]);
+        
+        trackError(err, {
+          'operation': 'fetch_history',
+          'host.name': host,
+          'api.endpoint': url,
+        });
+        
+        span.setAttributes({
+          'operation.success': false,
+          'error.message': err.message,
+        });
+        apiSpan.setAttributes({
+          'operation.success': false,
+          'error.message': err.message,
+        });
+        span.end();
+        apiSpan.end();
       })
       .finally(() => setLoading(false));
   };
   
   const handleFilterChange = (filterName, value) => {
+    const span = trackUserFlow('filtering', 'change_filter', {
+      'filter.name': filterName,
+      'filter.value': value,
+      'has_selected_host': Boolean(selectedHost),
+    });
+    
     const newFilters = { ...filters, [filterName]: value };
     setFilters(newFilters);
     
@@ -176,9 +263,16 @@ function App() {
     if (selectedHost) {
       fetchHistory(selectedHost, newFilters);
     }
+    
+    span.end();
   };
   
   const clearFilters = () => {
+    const span = trackUserFlow('filtering', 'clear_filters', {
+      'has_selected_host': Boolean(selectedHost),
+      'active_filters_count': Object.values(filters).filter(v => v).length,
+    });
+    
     const emptyFilters = {
       dateFrom: '',
       dateTo: '',
@@ -191,6 +285,8 @@ function App() {
     if (selectedHost) {
       fetchHistory(selectedHost, emptyFilters);
     }
+    
+    span.end();
   };
   
   const hasActiveFilters = filters.dateFrom || filters.dateTo || filters.os || filters.package;

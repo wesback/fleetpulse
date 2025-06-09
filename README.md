@@ -14,6 +14,7 @@ Vibcoding for the win!
 - 📦 **Works with any OS**: Includes drop-in Ansible snippets for ArchLinux and Debian/Ubuntu
 - 🐳 **Docker Compose**: One command to launch everything
 - 👀 **Zero-config UI**: Open your browser and see updates at a glance
+- 📊 **OpenTelemetry Observability**: Comprehensive tracing, metrics, and logging
 
 ---
 
@@ -210,6 +211,167 @@ Add the relevant Ansible snippet to your playbooks and your updates will appear 
     status_code: [200, 201]
   when: updated_packages_json.stdout != "[]"
 ```
+
+---
+
+## Observability with OpenTelemetry
+
+FleetPulse includes comprehensive OpenTelemetry instrumentation for both backend and frontend, providing deep insights into application performance and user behavior.
+
+### Features
+
+- 📊 **Distributed Tracing**: End-to-end request tracing from frontend to backend
+- 📈 **Metrics Collection**: API response times, error rates, and business KPIs
+- 🔍 **Real User Monitoring**: Frontend performance and user interaction tracking
+- 📝 **Structured Logging**: Trace-correlated logs for debugging
+- 🎯 **Custom Spans**: Business logic instrumentation for package updates and host management
+
+### Quick Start with Observability
+
+Launch FleetPulse with Jaeger for observability:
+
+```bash
+# Enable telemetry (enabled by default)
+export OTEL_ENABLE_TELEMETRY=true
+
+# Launch with Jaeger included
+docker compose up --build -d
+
+# Access services
+# - FleetPulse UI: http://localhost:8080
+# - Jaeger UI: http://localhost:16686
+```
+
+### Telemetry Configuration
+
+Configure telemetry through environment variables in `.env` file:
+
+```bash
+# Basic Configuration
+OTEL_ENABLE_TELEMETRY=true
+OTEL_ENVIRONMENT=development
+OTEL_EXPORTER_TYPE=jaeger
+
+# Sampling (adjust for production)
+OTEL_TRACE_SAMPLE_RATE=1.0  # 100% for development, consider 0.1 (10%) for production
+```
+
+#### Available Exporters
+
+**Jaeger (Default - Recommended for Development)**
+```bash
+OTEL_EXPORTER_TYPE=jaeger
+# Jaeger UI: http://localhost:16686
+```
+
+**OpenTelemetry Collector (Recommended for Production)**
+```bash
+OTEL_EXPORTER_TYPE=otlp
+OTEL_EXPORTER_OTLP_ENDPOINT=http://your-otel-collector:4317
+```
+
+**Console (Debug)**
+```bash
+OTEL_EXPORTER_TYPE=console
+# Traces logged to application console
+```
+
+### Production Configuration Example
+
+```bash
+# .env for production
+OTEL_ENABLE_TELEMETRY=true
+OTEL_ENVIRONMENT=production
+OTEL_EXPORTER_TYPE=otlp
+OTEL_TRACE_SAMPLE_RATE=0.1
+OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+```
+
+### Viewing Traces and Metrics
+
+#### Jaeger UI (Default Setup)
+
+1. Open http://localhost:16686
+2. Select service: `fleetpulse-backend` or `fleetpulse-frontend`
+3. Click "Find Traces" to see recent activity
+4. Click on traces to see detailed spans and timing
+
+#### Key Traces to Monitor
+
+**Backend Traces:**
+- `report_package_updates`: Package update submissions
+- `fetch_hosts`: Host listing operations
+- `fetch_history`: Package history queries
+- `health_check`: Service health monitoring
+
+**Frontend Traces:**
+- `user_flow.*`: User interaction flows
+- `api_call`: Frontend-to-backend API calls
+- `page_load`: Initial page load performance
+- `core_web_vital.*`: Web performance metrics
+
+#### Custom Business Metrics
+
+- `package_updates_total`: Total package updates by host
+- `active_hosts_total`: Number of active hosts
+- `http_requests_total`: API request count by endpoint
+- `http_request_duration_ms`: API response times
+
+### Troubleshooting Telemetry
+
+#### Check Telemetry Status
+
+```bash
+# Check health endpoint for telemetry status
+curl http://localhost:8000/health
+
+# Response includes telemetry configuration:
+{
+  "status": "healthy",
+  "database": "connected",
+  "telemetry": {
+    "enabled": true,
+    "service_name": "fleetpulse-backend",
+    "service_version": "1.0.0",
+    "environment": "development",
+    "exporter_type": "jaeger"
+  }
+}
+```
+
+#### Common Issues
+
+**No traces in Jaeger:**
+- Verify `OTEL_ENABLE_TELEMETRY=true`
+- Check Jaeger container is running: `docker ps | grep jaeger`
+- Verify sampling rate: `OTEL_TRACE_SAMPLE_RATE=1.0`
+
+**High overhead in production:**
+- Reduce sampling: `OTEL_TRACE_SAMPLE_RATE=0.1`
+- Switch to OTLP with collector: `OTEL_EXPORTER_TYPE=otlp`
+
+**Network connectivity issues:**
+- Check Jaeger endpoint accessibility
+- Verify Docker network configuration
+- Review container logs: `docker logs fleetpulse-jaeger`
+
+#### Disabling Telemetry
+
+```bash
+# Disable completely
+OTEL_ENABLE_TELEMETRY=false
+
+# Or remove Jaeger from docker-compose
+docker compose up backend frontend
+```
+
+### Telemetry Best Practices
+
+- **Development**: Use 100% sampling rate with Jaeger for full visibility
+- **Production**: Use 10% sampling rate with OTLP collector for efficiency
+- **Monitoring**: Set up alerts on telemetry pipeline health
+- **Security**: Ensure telemetry data doesn't include sensitive information
+- **Performance**: Monitor telemetry overhead and adjust sampling accordingly
 
 ---
 
