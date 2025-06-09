@@ -208,14 +208,14 @@ def setup_auto_instrumentation():
         return
     
     # Instrument FastAPI
-    FastAPIInstrumentor.instrument()
+    FastAPIInstrumentor().instrument()
     
     # Instrument SQLAlchemy
-    SQLAlchemyInstrumentor.instrument()
+    SQLAlchemyInstrumentor().instrument()
     
     # Instrument HTTP clients
-    HTTPXClientInstrumentor.instrument()
-    RequestsInstrumentor.instrument()
+    HTTPXClientInstrumentor().instrument()
+    RequestsInstrumentor().instrument()
     
     logger.info("Auto-instrumentation configured")
 
