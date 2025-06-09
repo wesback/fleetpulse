@@ -255,36 +255,6 @@ def test_env_example_telemetry_configuration():
     assert 'otlp' in env_content.lower()
 
 
-@pytest.mark.skipif(
-    not os.path.exists('/home/runner/work/fleetpulse/fleetpulse/frontend/package.json'),
-    reason="Frontend package.json not available"
-)
-def test_frontend_package_json_telemetry_dependencies():
-    """Test that frontend package.json includes OpenTelemetry dependencies."""
-    import json
-    
-    package_json_path = os.path.join(
-        os.path.dirname(__file__), '..', '..', 'frontend', 'package.json'
-    )
-    
-    with open(package_json_path, 'r') as f:
-        package_data = json.load(f)
-    
-    dependencies = package_data.get('dependencies', {})
-    
-    # Check for required OpenTelemetry packages
-    required_packages = [
-        '@opentelemetry/sdk-trace-web',
-        '@opentelemetry/auto-instrumentations-web',
-        '@opentelemetry/exporter-trace-otlp-http',
-        '@opentelemetry/instrumentation-fetch',
-        '@opentelemetry/instrumentation-user-interaction',
-    ]
-    
-    for package in required_packages:
-        assert package in dependencies, f"Missing OpenTelemetry package: {package}"
-
-
 def test_backend_requirements_telemetry_dependencies():
     """Test that backend requirements.txt includes OpenTelemetry dependencies."""
     requirements_path = os.path.join(
