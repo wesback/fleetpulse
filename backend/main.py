@@ -70,8 +70,8 @@ def validate_package_name(name: str) -> bool:
     """Validate package name format and length."""
     if not name or len(name) > MAX_PACKAGE_NAME_LENGTH:
         return False
-    # Allow alphanumeric, dots, hyphens, underscores, plus signs
-    pattern = r'^[a-zA-Z0-9._+-]+$'
+    # Allow alphanumeric, dots, hyphens, underscores, plus signs, colons
+    pattern = r'^[a-zA-Z0-9._+-:]+$'
     return bool(re.match(pattern, name))
 
 def validate_version(version: str) -> bool:

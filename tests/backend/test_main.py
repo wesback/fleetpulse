@@ -339,3 +339,32 @@ def test_host_history_no_results_with_filters(client_with_db_override):
     assert response.status_code == 404
     error_msg = response.json().get('error') or response.json().get('detail')
     assert "No update history found" in error_msg
+
+def test_report_update_with_colon_in_package_name(client_with_db_override):
+    """Test that package names containing colons are accepted (e.g., architecture-specific packages)."""
+    today = date.today()
+    
+    # Test the specific case from the issue: systemd-sysv:arm64
+    response = client_with_db_override.post("/report", json={
+        "hostname": "colon-test-host",
+        "os": "ubuntu",
+        "update_date": today.isoformat(),
+        "updated_packages": [
+            {"name": "systemd-sysv:arm64", "old_version": "1.0", "new_version": "1.1"},
+            {"name": "libc6:amd64", "old_version": "2.31", "new_version": "2.32"},
+            {"name": "regular-package", "old_version": "1.0", "new_version": "1.1"}
+        ]
+    })
+    
+    assert response.status_code == 201
+    
+    # Verify the packages were stored correctly
+    response = client_with_db_override.get("/history/colon-test-host")
+    assert response.status_code == 200
+    history = response.json()
+    assert len(history) == 3
+    
+    package_names = [item['name'] for item in history]
+    assert 'systemd-sysv:arm64' in package_names
+    assert 'libc6:amd64' in package_names
+    assert 'regular-package' in package_names
