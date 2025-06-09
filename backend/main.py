@@ -13,7 +13,7 @@ import time
 
 # Import telemetry after standard imports  
 try:
-    from backend.telemetry import (
+    from telemetry import (
         initialize_telemetry, 
         shutdown_telemetry,
         create_custom_span,
@@ -552,7 +552,7 @@ def health_check(session: Session = Depends(get_session)):
             
             # Get telemetry configuration
             if TELEMETRY_ENABLED:
-                from backend.telemetry import get_telemetry_config
+                from telemetry import get_telemetry_config
                 telemetry_config = get_telemetry_config()
                 health_data = {
                     "status": "healthy", 
