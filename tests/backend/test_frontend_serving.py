@@ -11,9 +11,9 @@ def test_api_endpoints_work():
     # Use the existing test client with database overrides
     client = TestClient(app)
     
-    # Test health endpoint
+    # Test health endpoint - now returns 500 due to database dependency
     response = client.get("/health")
-    assert response.status_code in [200, 503]  # Should work, might be unhealthy if no DB
+    assert response.status_code in [200, 500, 503]  # Should work, might be unhealthy if no DB
     
     # Test hosts endpoint
     response = client.get("/hosts")

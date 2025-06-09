@@ -543,13 +543,12 @@ def last_updates(session: Session = Depends(get_session)):
         )
 
 @app.get("/health")
-def health_check():
+def health_check(session: Session = Depends(get_session)):
     """Health check endpoint with telemetry information."""
     with create_custom_span("health_check") as span:
         try:
             # Test database connection
-            with Session(get_engine()) as session:
-                session.exec(select(1)).first()
+            session.exec(select(1)).first()
             
             # Get telemetry configuration
             if TELEMETRY_ENABLED:
