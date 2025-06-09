@@ -274,9 +274,9 @@ def test_frontend_package_json_telemetry_dependencies():
     
     # Check for required OpenTelemetry packages
     required_packages = [
-        '@opentelemetry/web',
+        '@opentelemetry/sdk-trace-web',
         '@opentelemetry/auto-instrumentations-web',
-        '@opentelemetry/exporter-jaeger',
+        '@opentelemetry/exporter-trace-otlp-http',
         '@opentelemetry/instrumentation-fetch',
         '@opentelemetry/instrumentation-user-interaction',
     ]
