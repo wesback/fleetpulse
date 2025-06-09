@@ -14,8 +14,7 @@ import { Resource } from '@opentelemetry/resources';
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { getWebAutoInstrumentations } from '@opentelemetry/auto-instrumentations-web';
 import { registerInstrumentations } from '@opentelemetry/instrumentation';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-otlp-http';
-import { JaegerExporter } from '@opentelemetry/exporter-jaeger';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { B3Propagator } from '@opentelemetry/propagator-b3';
 import { JaegerPropagator } from '@opentelemetry/propagator-jaeger';
 import { propagation, trace, context } from '@opentelemetry/api';
@@ -88,8 +87,9 @@ function setupTracing() {
   // Configure exporter based on type
   let exporter;
   if (config.exporterType === 'jaeger') {
-    exporter = new JaegerExporter({
-      endpoint: config.jaegerEndpoint,
+    // For web browsers, use OTLP to send to OpenTelemetry Collector which forwards to Jaeger
+    exporter = new OTLPTraceExporter({
+      url: config.otlpEndpoint, // Collector endpoint that forwards to Jaeger
     });
   } else if (config.exporterType === 'otlp') {
     exporter = new OTLPTraceExporter({
