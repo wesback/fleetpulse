@@ -10,7 +10,17 @@
     "axios": "^1.7.9",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-scripts": "5.0.1"
+    "react-scripts": "5.0.1",
+    "@opentelemetry/web": "^1.28.0",
+    "@opentelemetry/auto-instrumentations-web": "^0.42.0",
+    "@opentelemetry/exporter-otlp-http": "^0.56.0",
+    "@opentelemetry/exporter-jaeger": "^1.28.0",
+    "@opentelemetry/propagator-b3": "^1.28.0",
+    "@opentelemetry/propagator-jaeger": "^1.28.0",
+    "@opentelemetry/instrumentation": "^0.56.0",
+    "@opentelemetry/instrumentation-fetch": "^0.56.0",
+    "@opentelemetry/instrumentation-xml-http-request": "^0.56.0",
+    "@opentelemetry/instrumentation-user-interaction": "^0.42.0"
   },
   "scripts": {
     "start": "NODE_NO_WARNINGS=1 react-scripts start",

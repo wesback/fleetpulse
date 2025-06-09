@@ -5,3 +5,23 @@ sqlmodel==0.0.22
 pytest==8.3.4 # For running tests
 pytest-asyncio==0.23.6 # For async test support
 httpx==0.28.1 # For TestClient
+
+# OpenTelemetry core packages
+opentelemetry-api==1.28.2
+opentelemetry-sdk==1.28.2
+opentelemetry-semantic-conventions==0.49b2
+
+# OpenTelemetry auto-instrumentation
+opentelemetry-instrumentation==0.49b2
+opentelemetry-instrumentation-fastapi==0.49b2
+opentelemetry-instrumentation-sqlalchemy==0.49b2
+opentelemetry-instrumentation-httpx==0.49b2
+opentelemetry-instrumentation-requests==0.49b2
+
+# OpenTelemetry exporters (using compatible versions)
+opentelemetry-exporter-otlp==1.28.2
+opentelemetry-exporter-jaeger==1.21.0
+
+# OpenTelemetry propagators 
+opentelemetry-propagator-b3==1.28.2
+opentelemetry-propagator-jaeger==1.28.2

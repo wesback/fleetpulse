@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Query
+from fastapi import FastAPI, Depends, HTTPException, status, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlmodel import SQLModel, Field, Session, create_engine, select
@@ -9,6 +9,37 @@ import os
 import logging
 from contextlib import asynccontextmanager
 import re
+import time
+
+# Import telemetry after standard imports  
+try:
+    from backend.telemetry import (
+        initialize_telemetry, 
+        shutdown_telemetry,
+        create_custom_span,
+        record_request_metrics,
+        record_package_update_metrics,
+        record_host_metrics,
+        add_baggage,
+        get_tracer,
+    )
+    TELEMETRY_ENABLED = True
+except ImportError:
+    # Telemetry dependencies not available - create stubs
+    TELEMETRY_ENABLED = False
+    def initialize_telemetry(): pass
+    def shutdown_telemetry(): pass
+    def create_custom_span(name, attributes=None):
+        class DummySpan:
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def set_attribute(self, key, value): pass
+        return DummySpan()
+    def record_request_metrics(*args, **kwargs): pass
+    def record_package_update_metrics(*args, **kwargs): pass
+    def record_host_metrics(*args, **kwargs): pass
+    def add_baggage(*args, **kwargs): pass
+    def get_tracer(*args, **kwargs): None
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -155,6 +186,10 @@ async def lifespan(app: FastAPI):
     # Startup
     try:
         logger.info(f"Starting FleetPulse application")
+        
+        # Initialize OpenTelemetry first
+        initialize_telemetry()
+        
         logger.info(f"Data directory: {DATA_DIR}")
         logger.info(f"Database path: {DB_PATH}")
         
@@ -215,6 +250,7 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info("Application shutting down")
+    shutdown_telemetry()
 
 # Initialize FastAPI app with lifespan
 app = FastAPI(
@@ -232,6 +268,35 @@ app.add_middleware(
     allow_methods=["GET", "POST"],  # Only allow necessary methods
     allow_headers=["*"],
 )
+
+# Telemetry middleware to capture request metrics
+@app.middleware("http")
+async def telemetry_middleware(request: Request, call_next):
+    """Middleware to capture request telemetry."""
+    start_time = time.time()
+    
+    # Add baggage for request tracking
+    add_baggage("request.method", request.method)
+    add_baggage("request.url", str(request.url))
+    
+    response = await call_next(request)
+    
+    # Calculate duration and record metrics
+    duration_ms = (time.time() - start_time) * 1000
+    
+    # Extract endpoint path template
+    endpoint = request.url.path
+    if hasattr(request, "path_info"):
+        endpoint = request.path_info
+    
+    record_request_metrics(
+        method=request.method,
+        endpoint=endpoint,
+        status_code=response.status_code,
+        duration_ms=duration_ms
+    )
+    
+    return response
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
@@ -253,85 +318,113 @@ async def general_exception_handler(request, exc):
 @app.post("/report", status_code=status.HTTP_201_CREATED)
 def report_update(update: UpdateIn, session: Session = Depends(get_session)):
     """Report package updates for a host."""
-    try:
-        # Validate input data
-        if not validate_hostname(update.hostname):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid hostname format"
-            )
-        
-        if not validate_os(update.os):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid OS format"
-            )
-        
-        if not update.updated_packages:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No packages provided"
-            )
-        
-        if len(update.updated_packages) > 1000:  # Reasonable limit
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Too many packages in single request"
-            )
-        
-        # Validate each package
-        for pkg in update.updated_packages:
-            if not validate_package_name(pkg.name):
+    
+    # Create custom span for business logic
+    with create_custom_span("report_package_updates", {
+        "hostname": update.hostname,
+        "os": update.os,
+        "package_count": len(update.updated_packages),
+        "update_date": str(update.update_date),
+    }) as span:
+        try:
+            # Validate input data
+            if not validate_hostname(update.hostname):
+                span.set_attribute("validation.error", "invalid_hostname")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid package name: {pkg.name}"
+                    detail="Invalid hostname format"
                 )
             
-            if not validate_version(pkg.old_version):
+            if not validate_os(update.os):
+                span.set_attribute("validation.error", "invalid_os")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid old version: {pkg.old_version}"
+                    detail="Invalid OS format"
                 )
             
-            if not validate_version(pkg.new_version):
+            if not update.updated_packages:
+                span.set_attribute("validation.error", "no_packages")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid new version: {pkg.new_version}"
+                    detail="No packages provided"
                 )
-        
-        # Insert package updates using SQLModel (prevents SQL injection)
-        updates_added = 0
-        for pkg in update.updated_packages:
-            package_update = PackageUpdate(
-                hostname=update.hostname,
-                os=update.os,
-                update_date=update.update_date,
-                name=pkg.name,
-                old_version=pkg.old_version,
-                new_version=pkg.new_version
+            
+            if len(update.updated_packages) > 1000:  # Reasonable limit
+                span.set_attribute("validation.error", "too_many_packages")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Too many packages in single request"
+                )
+            
+            # Validate each package
+            for pkg in update.updated_packages:
+                if not validate_package_name(pkg.name):
+                    span.set_attribute("validation.error", f"invalid_package_name_{pkg.name}")
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid package name: {pkg.name}"
+                    )
+                
+                if not validate_version(pkg.old_version):
+                    span.set_attribute("validation.error", f"invalid_old_version_{pkg.old_version}")
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid old version: {pkg.old_version}"
+                )
+            
+                if not validate_version(pkg.new_version):
+                    span.set_attribute("validation.error", f"invalid_new_version_{pkg.new_version}")
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid new version: {pkg.new_version}"
+                    )
+            
+            span.set_attribute("validation.passed", True)
+            
+            # Insert package updates using SQLModel (prevents SQL injection)
+            updates_added = 0
+            for pkg in update.updated_packages:
+                package_update = PackageUpdate(
+                    hostname=update.hostname,
+                    os=update.os,
+                    update_date=update.update_date,
+                    name=pkg.name,
+                    old_version=pkg.old_version,
+                    new_version=pkg.new_version
+                )
+                session.add(package_update)
+                updates_added += 1
+            
+            session.commit()
+            
+            # Record business metrics
+            record_package_update_metrics(update.hostname, updates_added)
+            record_host_metrics(update.hostname, "add")
+            
+            span.set_attribute("updates.added", updates_added)
+            span.set_attribute("operation.success", True)
+            
+            logger.info(f"Added {updates_added} package updates for host {update.hostname}")
+            
+            return {
+                "status": "success",
+                "message": f"Recorded {updates_added} package updates",
+                "hostname": update.hostname
+            }
+            
+        except HTTPException:
+            session.rollback()
+            span.set_attribute("operation.success", False)
+            raise
+        except Exception as e:
+            session.rollback()
+            span.set_attribute("operation.success", False)
+            span.set_attribute("error.message", str(e))
+            logger.error(f"Error reporting update: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to record package updates"
             )
-            session.add(package_update)
-            updates_added += 1
-        
-        session.commit()
-        logger.info(f"Added {updates_added} package updates for host {update.hostname}")
-        
-        return {
-            "status": "success",
-            "message": f"Recorded {updates_added} package updates",
-            "hostname": update.hostname
-        }
-        
-    except HTTPException:
-        session.rollback()
-        raise
-    except Exception as e:
-        session.rollback()
-        logger.error(f"Error reporting update: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to record package updates"
-        )
 
 @app.get("/hosts", response_model=Dict[str, List[str]])
 def list_hosts(session: Session = Depends(get_session)):
@@ -451,18 +544,53 @@ def last_updates(session: Session = Depends(get_session)):
 
 @app.get("/health")
 def health_check():
-    """Health check endpoint."""
-    try:
-        # Test database connection
-        with Session(get_engine()) as session:
-            session.exec(select(1)).first()
-        return {"status": "healthy", "database": "connected"}
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Service unhealthy"
-        )
+    """Health check endpoint with telemetry information."""
+    with create_custom_span("health_check") as span:
+        try:
+            # Test database connection
+            with Session(get_engine()) as session:
+                session.exec(select(1)).first()
+            
+            # Get telemetry configuration
+            if TELEMETRY_ENABLED:
+                from backend.telemetry import get_telemetry_config
+                telemetry_config = get_telemetry_config()
+                health_data = {
+                    "status": "healthy", 
+                    "database": "connected",
+                    "telemetry": {
+                        "enabled": telemetry_config["enable_telemetry"],
+                        "service_name": telemetry_config["service_name"],
+                        "service_version": telemetry_config["service_version"],
+                        "environment": telemetry_config["environment"],
+                        "exporter_type": telemetry_config["exporter_type"],
+                    }
+                }
+                span.set_attribute("telemetry.enabled", telemetry_config["enable_telemetry"])
+            else:
+                health_data = {
+                    "status": "healthy", 
+                    "database": "connected",
+                    "telemetry": {
+                        "enabled": False,
+                        "note": "OpenTelemetry dependencies not installed"
+                    }
+                }
+                span.set_attribute("telemetry.enabled", False)
+            
+            span.set_attribute("health.status", "healthy")
+            span.set_attribute("database.status", "connected")
+            
+            return health_data
+            
+        except Exception as e:
+            span.set_attribute("health.status", "unhealthy")
+            span.set_attribute("error.message", str(e))
+            logger.error(f"Health check failed: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Service unhealthy"
+            )
 
 if __name__ == "__main__":
     import uvicorn
