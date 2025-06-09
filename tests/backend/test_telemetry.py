@@ -195,7 +195,7 @@ def test_docker_compose_telemetry_configuration():
     jaeger_service = compose_config['services']['jaeger']
     
     # Verify Jaeger configuration
-    assert jaeger_service['image'] == 'jaegertracing/all-in-one:1.64'
+    assert jaeger_service['image'] == 'jaegertracing/all-in-one:latest'
     assert '16686:16686' in jaeger_service['ports']  # Jaeger UI
     assert '14268:14268' in jaeger_service['ports']  # HTTP collector
     
