@@ -14,7 +14,7 @@ Vibcoding for the win!
 - 📦 **Works with any OS**: Includes drop-in Ansible snippets for ArchLinux and Debian/Ubuntu
 - 🐳 **Docker Compose**: One command to launch everything
 - 👀 **Zero-config UI**: Open your browser and see updates at a glance
-- 📊 **OpenTelemetry Observability**: Comprehensive tracing, metrics, and logging
+- 📊 **OpenTelemetry Observability**: Backend tracing, metrics, and logging
 
 ---
 
@@ -214,15 +214,14 @@ Add the relevant Ansible snippet to your playbooks and your updates will appear 
 
 ---
 
-## Observability with OpenTelemetry
+## Backend Observability with OpenTelemetry
 
-FleetPulse includes comprehensive OpenTelemetry instrumentation for both backend and frontend, providing deep insights into application performance and user behavior.
+FleetPulse includes comprehensive OpenTelemetry instrumentation for the backend, providing insights into API performance and server-side operations.
 
 ### Features
 
-- 📊 **Distributed Tracing**: End-to-end request tracing from frontend to backend
+- 📊 **Distributed Tracing**: Backend API request tracing and database operations
 - 📈 **Metrics Collection**: API response times, error rates, and business KPIs
-- 🔍 **Real User Monitoring**: Frontend performance and user interaction tracking
 - 📝 **Structured Logging**: Trace-correlated logs for debugging
 - 🎯 **Custom Spans**: Business logic instrumentation for package updates and host management
 
@@ -292,7 +291,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
 #### Jaeger UI (Default Setup)
 
 1. Open http://localhost:16686
-2. Select service: `fleetpulse-backend` or `fleetpulse-frontend`
+2. Select service: `fleetpulse-backend`
 3. Click "Find Traces" to see recent activity
 4. Click on traces to see detailed spans and timing
 
@@ -303,12 +302,6 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
 - `fetch_hosts`: Host listing operations
 - `fetch_history`: Package history queries
 - `health_check`: Service health monitoring
-
-**Frontend Traces:**
-- `user_flow.*`: User interaction flows
-- `api_call`: Frontend-to-backend API calls
-- `page_load`: Initial page load performance
-- `core_web_vital.*`: Web performance metrics
 
 #### Custom Business Metrics
 

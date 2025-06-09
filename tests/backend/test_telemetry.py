@@ -213,22 +213,13 @@ def test_docker_compose_telemetry_configuration():
     for env_var in telemetry_env_vars:
         assert env_var in backend_env
     
-    # Check frontend telemetry environment variables
-    frontend_service = compose_config['services']['frontend']
-    frontend_env = frontend_service['environment']
-    
-    frontend_telemetry_vars = [
-        'REACT_APP_OTEL_SERVICE_NAME=fleetpulse-frontend',
-        'REACT_APP_OTEL_SERVICE_VERSION=1.0.0',
-        'REACT_APP_OTEL_ENABLE_TELEMETRY=${OTEL_ENABLE_TELEMETRY:-true}',
-    ]
-    
-    for env_var in frontend_telemetry_vars:
-        assert env_var in frontend_env
-    
-    # Check that services depend on Jaeger
+    # Check that backend service depends on Jaeger
     assert 'jaeger' in backend_service['depends_on']
-    assert 'jaeger' in frontend_service['depends_on']
+    
+    # Frontend service should exist but have no telemetry environment variables
+    frontend_service = compose_config['services']['frontend']
+    # Frontend should not have telemetry environment variables since telemetry is backend-only
+    assert 'environment' not in frontend_service or frontend_service.get('environment') is None
 
 
 def test_env_example_telemetry_configuration():
