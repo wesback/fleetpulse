@@ -24,6 +24,7 @@ services:
       - OTEL_ENABLE_TELEMETRY=${OTEL_ENABLE_TELEMETRY:-true}
       - OTEL_EXPORTER_TYPE=${OTEL_EXPORTER_TYPE:-jaeger}
       - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
       - OTEL_TRACE_SAMPLE_RATE=${OTEL_TRACE_SAMPLE_RATE:-1.0}
       - JAEGER_AGENT_HOST=jaeger
       - JAEGER_AGENT_PORT=6831
@@ -31,6 +32,7 @@ services:
       - fleetpulse
     depends_on:
       - jaeger
+      - otel-collector
 
   frontend:
     build:
@@ -57,6 +59,23 @@ services:
     environment:
       - COLLECTOR_OTLP_ENABLED=true
       - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+    restart: unless-stopped
+    networks:
+      - fleetpulse
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: fleetpulse-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8888:8888"   # Prometheus metrics
+      - "8889:8889"   # Prometheus exporter metrics
+    depends_on:
+      - jaeger
     restart: unless-stopped
     networks:
       - fleetpulse

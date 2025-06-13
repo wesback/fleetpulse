@@ -16,6 +16,7 @@ try:
     from telemetry import (
         initialize_telemetry, 
         shutdown_telemetry,
+        instrument_fastapi_app,
         create_custom_span,
         record_request_metrics,
         record_package_update_metrics,
@@ -29,6 +30,7 @@ except ImportError:
     TELEMETRY_ENABLED = False
     def initialize_telemetry(): pass
     def shutdown_telemetry(): pass
+    def instrument_fastapi_app(app): pass
     def create_custom_span(name, attributes=None):
         class DummySpan:
             def __enter__(self): return self
@@ -259,6 +261,9 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Instrument FastAPI app for OpenTelemetry tracing
+instrument_fastapi_app(app)
 
 # CORS middleware with more restrictive settings
 app.add_middleware(
