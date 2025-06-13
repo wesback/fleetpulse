@@ -49,15 +49,20 @@ describe('App', () => {
 
   it('shows update history for selected host', async () => {
     axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
-    axios.get.mockResolvedValueOnce({ data: [
-      {
-        update_date: '2025-06-07',
-        os: 'Ubuntu',
-        name: 'nginx',
-        old_version: '1.18.0',
-        new_version: '1.20.0',
-      },
-    ] });
+    axios.get.mockResolvedValueOnce({ data: {
+      items: [
+        {
+          update_date: '2025-06-07',
+          os: 'Ubuntu',
+          name: 'nginx',
+          old_version: '1.18.0',
+          new_version: '1.20.0',
+        },
+      ],
+      total: 1,
+      limit: 25,
+      offset: 0
+    } });
     
     await act(async () => {
       render(<App />);
@@ -75,7 +80,10 @@ describe('App', () => {
 
   it('shows message when no update history is found', async () => {
     axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
-    axios.get.mockResolvedValueOnce({ data: [] });
+    // Mock 404 response
+    axios.get.mockRejectedValueOnce({
+      response: { status: 404 }
+    });
     
     await act(async () => {
       render(<App />);
@@ -104,7 +112,7 @@ describe('App', () => {
     expect(screen.getByRole('progressbar')).toBeInTheDocument();
     
     await act(async () => {
-      resolve({ data: [] });
+      resolve({ data: { items: [], total: 0, limit: 25, offset: 0 } });
     });
     
     await waitFor(() => expect(screen.queryByRole('progressbar')).not.toBeInTheDocument());
@@ -225,17 +233,27 @@ describe('App', () => {
   it('applies date filters when changed', async () => {
     axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
     // First call for initial load
-    axios.get.mockResolvedValueOnce({ data: [
-      {
-        update_date: '2025-06-07',
-        os: 'Ubuntu',
-        name: 'nginx',
-        old_version: '1.18.0',
-        new_version: '1.20.0',
-      },
-    ] });
+    axios.get.mockResolvedValueOnce({ data: {
+      items: [
+        {
+          update_date: '2025-06-07',
+          os: 'Ubuntu',
+          name: 'nginx',
+          old_version: '1.18.0',
+          new_version: '1.20.0',
+        },
+      ],
+      total: 1,
+      limit: 25,
+      offset: 0
+    } });
     // Second call with date filter
-    axios.get.mockResolvedValueOnce({ data: [] });
+    axios.get.mockResolvedValueOnce({ data: {
+      items: [],
+      total: 0,
+      limit: 25,
+      offset: 0
+    } });
     
     await act(async () => {
       render(<App />);
@@ -264,17 +282,27 @@ describe('App', () => {
   it('applies package name filter when changed', async () => {
     axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
     // First call for initial load
-    axios.get.mockResolvedValueOnce({ data: [
-      {
-        update_date: '2025-06-07',
-        os: 'Ubuntu',
-        name: 'nginx',
-        old_version: '1.18.0',
-        new_version: '1.20.0',
-      },
-    ] });
+    axios.get.mockResolvedValueOnce({ data: {
+      items: [
+        {
+          update_date: '2025-06-07',
+          os: 'Ubuntu',
+          name: 'nginx',
+          old_version: '1.18.0',
+          new_version: '1.20.0',
+        },
+      ],
+      total: 1,
+      limit: 25,
+      offset: 0
+    } });
     // Second call with package filter
-    axios.get.mockResolvedValueOnce({ data: [] });
+    axios.get.mockResolvedValueOnce({ data: {
+      items: [],
+      total: 0,
+      limit: 25,
+      offset: 0
+    } });
     
     await act(async () => {
       render(<App />);
@@ -303,27 +331,42 @@ describe('App', () => {
   it('clears all filters when clear button is clicked', async () => {
     axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
     // First call for initial load
-    axios.get.mockResolvedValueOnce({ data: [
-      {
-        update_date: '2025-06-07',
-        os: 'Ubuntu',
-        name: 'nginx',
-        old_version: '1.18.0',
-        new_version: '1.20.0',
-      },
-    ] });
+    axios.get.mockResolvedValueOnce({ data: {
+      items: [
+        {
+          update_date: '2025-06-07',
+          os: 'Ubuntu',
+          name: 'nginx',
+          old_version: '1.18.0',
+          new_version: '1.20.0',
+        },
+      ],
+      total: 1,
+      limit: 25,
+      offset: 0
+    } });
     // Second call with package filter
-    axios.get.mockResolvedValueOnce({ data: [] });
+    axios.get.mockResolvedValueOnce({ data: {
+      items: [],
+      total: 0,
+      limit: 25,
+      offset: 0
+    } });
     // Third call after clearing filters
-    axios.get.mockResolvedValueOnce({ data: [
-      {
-        update_date: '2025-06-07',
-        os: 'Ubuntu',
-        name: 'nginx',
-        old_version: '1.18.0',
-        new_version: '1.20.0',
-      },
-    ] });
+    axios.get.mockResolvedValueOnce({ data: {
+      items: [
+        {
+          update_date: '2025-06-07',
+          os: 'Ubuntu',
+          name: 'nginx',
+          old_version: '1.18.0',
+          new_version: '1.20.0',
+        },
+      ],
+      total: 1,
+      limit: 25,
+      offset: 0
+    } });
     
     await act(async () => {
       render(<App />);
@@ -351,35 +394,45 @@ describe('App', () => {
     // Check that filters are cleared
     expect(packageInput.value).toBe('');
     
-    // Check that the API was called without filter parameters
+    // Check that the API was called without filter parameters (but with pagination)
     await waitFor(() => {
       const lastCall = axios.get.mock.calls[axios.get.mock.calls.length - 1];
-      expect(lastCall[0]).toBe('/api/history/host1');
+      expect(lastCall[0]).toContain('/api/history/host1?limit=25&offset=0');
     });
   });
 
   it('shows filtered message when filters are active', async () => {
     axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
     // First call for initial load
-    axios.get.mockResolvedValueOnce({ data: [
-      {
-        update_date: '2025-06-07',
-        os: 'Ubuntu',
-        name: 'nginx',
-        old_version: '1.18.0',
-        new_version: '1.20.0',
-      },
-    ] });
+    axios.get.mockResolvedValueOnce({ data: {
+      items: [
+        {
+          update_date: '2025-06-07',
+          os: 'Ubuntu',
+          name: 'nginx',
+          old_version: '1.18.0',
+          new_version: '1.20.0',
+        },
+      ],
+      total: 1,
+      limit: 25,
+      offset: 0
+    } });
     // Second call with filter
-    axios.get.mockResolvedValueOnce({ data: [
-      {
-        update_date: '2025-06-07',
-        os: 'Ubuntu',
-        name: 'nginx',
-        old_version: '1.18.0',
-        new_version: '1.20.0',
-      },
-    ] });
+    axios.get.mockResolvedValueOnce({ data: {
+      items: [
+        {
+          update_date: '2025-06-07',
+          os: 'Ubuntu',
+          name: 'nginx',
+          old_version: '1.18.0',
+          new_version: '1.20.0',
+        },
+      ],
+      total: 1,
+      limit: 25,
+      offset: 0
+    } });
     
     await act(async () => {
       render(<App />);
@@ -401,7 +454,89 @@ describe('App', () => {
     // Check for active filter indicator and filtered results message
     await waitFor(() => {
       expect(screen.getByText('Active')).toBeInTheDocument();
-      expect(screen.getByText('Showing 1 update (filtered)')).toBeInTheDocument();
+      expect(screen.getByText('Showing 1 of 1 update (filtered)')).toBeInTheDocument();
     });
+  });
+
+  it('renders pagination controls when there are multiple pages', async () => {
+    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
+    // Mock response with multiple pages worth of data
+    axios.get.mockResolvedValueOnce({ data: {
+      items: Array.from({ length: 25 }, (_, i) => ({
+        update_date: '2025-06-07',
+        os: 'Ubuntu',
+        name: `package${i}`,
+        old_version: '1.0.0',
+        new_version: '1.1.0',
+      })),
+      total: 100, // More than one page (25 per page)
+      limit: 25,
+      offset: 0
+    } });
+    
+    await act(async () => {
+      render(<App />);
+    });
+    
+    await act(async () => {
+      fireEvent.click(await screen.findByText('host1'));
+    });
+    
+    // Wait for initial load
+    await waitFor(() => expect(screen.getByText('package0')).toBeInTheDocument());
+    
+    // Check pagination info is displayed
+    expect(screen.getByText('Showing 25 of 100 updates • Page 1 of 4')).toBeInTheDocument();
+    
+    // Check pagination controls are rendered
+    const pagination = screen.getByRole('navigation');
+    expect(pagination).toBeInTheDocument();
+    
+    // Check page buttons
+    expect(screen.getByRole('button', { name: 'Go to page 2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Go to last page' })).toBeInTheDocument();
+  });
+
+  it('handles page navigation correctly', async () => {
+    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
+    // Initial page load
+    axios.get.mockResolvedValueOnce({ data: {
+      items: [{ update_date: '2025-06-07', os: 'Ubuntu', name: 'package1', old_version: '1.0.0', new_version: '1.1.0' }],
+      total: 50,
+      limit: 25,
+      offset: 0
+    } });
+    // Second page load
+    axios.get.mockResolvedValueOnce({ data: {
+      items: [{ update_date: '2025-06-07', os: 'Ubuntu', name: 'package26', old_version: '1.0.0', new_version: '1.1.0' }],
+      total: 50,
+      limit: 25,
+      offset: 25
+    } });
+    
+    await act(async () => {
+      render(<App />);
+    });
+    
+    await act(async () => {
+      fireEvent.click(await screen.findByText('host1'));
+    });
+    
+    // Wait for initial load
+    await waitFor(() => expect(screen.getByText('package1')).toBeInTheDocument());
+    
+    // Click page 2 button
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Go to page 2' }));
+    });
+    
+    // Check that the API was called with correct offset
+    await waitFor(() => {
+      const lastCall = axios.get.mock.calls[axios.get.mock.calls.length - 1];
+      expect(lastCall[0]).toContain('offset=25');
+    });
+    
+    // Check new content is displayed
+    await waitFor(() => expect(screen.getByText('package26')).toBeInTheDocument());
   });
 });
