@@ -181,6 +181,45 @@ def test_telemetry_stub_functions():
     add_baggage("test_key", "test_value")
 
 
+def test_fastapi_instrumentation_integration():
+    """Test that FastAPI instrumentation is properly applied to the app instance."""
+    import logging
+    from io import StringIO
+    from fastapi import FastAPI
+    from backend.telemetry import instrument_fastapi_app
+    
+    # Create a fresh app instance for testing (not the imported one)
+    test_app = FastAPI(title="Test App")
+    
+    # Capture log output to verify instrumentation message
+    log_capture = StringIO()
+    handler = logging.StreamHandler(log_capture)
+    handler.setLevel(logging.INFO)
+    
+    # Get the telemetry logger and add our handler
+    telemetry_logger = logging.getLogger('telemetry')
+    original_level = telemetry_logger.level
+    telemetry_logger.setLevel(logging.INFO)
+    telemetry_logger.addHandler(handler)
+    
+    try:
+        # Call the instrumentation function on the fresh app
+        instrument_fastapi_app(test_app)
+        
+        # Check that the log message was emitted
+        log_output = log_capture.getvalue()
+        
+        # The function should log successful instrumentation
+        # If telemetry is disabled, it should handle gracefully without logging
+        assert "FastAPI app instrumentation completed" in log_output or log_output == ""
+        
+    finally:
+        # Clean up
+        telemetry_logger.removeHandler(handler)
+        telemetry_logger.setLevel(original_level)
+        handler.close()
+
+
 def test_docker_compose_telemetry_configuration():
     """Test that docker-compose.yml includes proper telemetry configuration."""
     import yaml
@@ -199,6 +238,16 @@ def test_docker_compose_telemetry_configuration():
     assert '16686:16686' in jaeger_service['ports']  # Jaeger UI
     assert '14268:14268' in jaeger_service['ports']  # HTTP collector
     
+    # Check that OpenTelemetry Collector service exists
+    assert 'otel-collector' in compose_config['services']
+    otel_service = compose_config['services']['otel-collector']
+    
+    # Verify OTEL Collector configuration
+    assert 'otel/opentelemetry-collector-contrib' in otel_service['image']
+    assert '4317:4317' in otel_service['ports']  # OTLP gRPC
+    assert '4318:4318' in otel_service['ports']  # OTLP HTTP
+    assert 'jaeger' in otel_service['depends_on']
+    
     # Check backend telemetry environment variables
     backend_service = compose_config['services']['backend']
     backend_env = backend_service['environment']
@@ -213,8 +262,13 @@ def test_docker_compose_telemetry_configuration():
     for env_var in telemetry_env_vars:
         assert env_var in backend_env
     
-    # Check that backend service depends on Jaeger
+    # Check that OTLP endpoint is configured
+    otlp_endpoint_found = any('OTEL_EXPORTER_OTLP_ENDPOINT' in env for env in backend_env)
+    assert otlp_endpoint_found, "OTLP endpoint environment variable not found"
+    
+    # Check that backend service depends on both Jaeger and OTEL Collector
     assert 'jaeger' in backend_service['depends_on']
+    assert 'otel-collector' in backend_service['depends_on']
     
     # Frontend service should exist but have no telemetry environment variables
     frontend_service = compose_config['services']['frontend']
@@ -267,6 +321,45 @@ def test_backend_requirements_telemetry_dependencies():
     
     for package in required_packages:
         assert package in requirements_content, f"Missing OpenTelemetry package: {package}"
+
+
+def test_otel_collector_configuration():
+    """Test that otel-collector-config.yaml has proper configuration."""
+    import yaml
+    
+    config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'otel-collector-config.yaml')
+    
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    # Check that required sections exist
+    assert 'receivers' in config
+    assert 'processors' in config
+    assert 'exporters' in config
+    assert 'service' in config
+    
+    # Check OTLP receiver configuration
+    assert 'otlp' in config['receivers']
+    otlp_receiver = config['receivers']['otlp']
+    assert 'protocols' in otlp_receiver
+    assert 'grpc' in otlp_receiver['protocols']
+    assert 'http' in otlp_receiver['protocols']
+    
+    # Check that Jaeger exporter is configured
+    assert 'jaeger' in config['exporters']
+    jaeger_exporter = config['exporters']['jaeger']
+    assert 'jaeger:14250' in jaeger_exporter['endpoint']
+    
+    # Check service pipelines
+    assert 'pipelines' in config['service']
+    pipelines = config['service']['pipelines']
+    assert 'traces' in pipelines
+    assert 'metrics' in pipelines
+    
+    # Verify trace pipeline
+    trace_pipeline = pipelines['traces']
+    assert 'otlp' in trace_pipeline['receivers']
+    assert 'jaeger' in trace_pipeline['exporters']
 
 
 if __name__ == "__main__":

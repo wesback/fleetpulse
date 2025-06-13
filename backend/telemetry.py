@@ -201,14 +201,14 @@ def setup_metrics():
 
 
 def setup_auto_instrumentation():
-    """Set up automatic instrumentation for frameworks and libraries."""
+    """Set up automatic instrumentation for frameworks and libraries (except FastAPI)."""
     config = get_telemetry_config()
     
     if not config["enable_telemetry"]:
         return
     
-    # Instrument FastAPI
-    FastAPIInstrumentor().instrument()
+    # Note: FastAPI instrumentation is handled separately in instrument_fastapi_app()
+    # to ensure proper app instance is used
     
     # Instrument SQLAlchemy
     SQLAlchemyInstrumentor().instrument()
@@ -217,7 +217,20 @@ def setup_auto_instrumentation():
     HTTPXClientInstrumentor().instrument()
     RequestsInstrumentor().instrument()
     
-    logger.info("Auto-instrumentation configured")
+    logger.info("Auto-instrumentation configured (except FastAPI)")
+
+
+def instrument_fastapi_app(app):
+    """Instrument the specific FastAPI app instance for tracing."""
+    config = get_telemetry_config()
+    
+    if not config["enable_telemetry"]:
+        return
+    
+    # Instrument the specific FastAPI app instance
+    FastAPIInstrumentor.instrument_app(app)
+    
+    logger.info("FastAPI app instrumentation completed")
 
 
 def setup_logging():
