@@ -31,6 +31,7 @@ import {
   Button,
   Chip,
   Stack,
+  Pagination,
 } from '@mui/material';
 import StorageIcon from '@mui/icons-material/Storage';
 import DnsIcon from '@mui/icons-material/Dns';
@@ -129,6 +130,13 @@ function App() {
     package: ''
   });
   
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    page: 1,           // 1-based page number for Material-UI
+    pageSize: 25,      // Items per page
+    total: 0           // Total number of items
+  });
+  
   // Available OS options for dropdown (populated from data)
   const [availableOSes, setAvailableOSes] = useState([]);
 
@@ -146,9 +154,12 @@ function App() {
       });
   }, []);
 
-  const fetchHistory = (host, currentFilters = filters) => {
+  const fetchHistory = (host, currentFilters = filters, currentPage = 1) => {
     setLoading(true);
     setSelectedHost(host);
+    
+    // Calculate offset based on page and pageSize
+    const offset = (currentPage - 1) * pagination.pageSize;
     
     // Build query parameters
     const params = new URLSearchParams();
@@ -157,20 +168,36 @@ function App() {
     if (currentFilters.os) params.append('os', currentFilters.os);
     if (currentFilters.package) params.append('package', currentFilters.package);
     
+    // Add pagination parameters
+    params.append('limit', pagination.pageSize.toString());
+    params.append('offset', offset.toString());
+    
     const queryString = params.toString();
-    const url = `${API_BASE}/history/${host}${queryString ? `?${queryString}` : ''}`;
+    const url = `${API_BASE}/history/${host}?${queryString}`;
     
     axios.get(url)
       .then(res => {
-        setHistory(res.data);
-        // Extract unique OS values for dropdown
-        const osSet = new Set(res.data.map(item => item.os));
+        const data = res.data;
+        setHistory(data.items || []);
+        setPagination(prev => ({
+          ...prev,
+          page: currentPage,
+          total: data.total || 0
+        }));
+        
+        // Extract unique OS values for dropdown from current page
+        const osSet = new Set((data.items || []).map(item => item.os));
         setAvailableOSes(Array.from(osSet).sort());
       })
       .catch(err => {
         console.error('Error fetching history:', err);
         setHistory([]);
         setAvailableOSes([]);
+        setPagination(prev => ({
+          ...prev,
+          page: currentPage,
+          total: 0
+        }));
       })
       .finally(() => setLoading(false));
   };
@@ -179,9 +206,12 @@ function App() {
     const newFilters = { ...filters, [filterName]: value };
     setFilters(newFilters);
     
+    // Reset to page 1 when filters change
+    setPagination(prev => ({ ...prev, page: 1 }));
+    
     // If a host is selected, re-fetch with new filters
     if (selectedHost) {
-      fetchHistory(selectedHost, newFilters);
+      fetchHistory(selectedHost, newFilters, 1);
     }
   };
   
@@ -194,9 +224,19 @@ function App() {
     };
     setFilters(emptyFilters);
     
+    // Reset to page 1 when clearing filters
+    setPagination(prev => ({ ...prev, page: 1 }));
+    
     // If a host is selected, re-fetch without filters
     if (selectedHost) {
-      fetchHistory(selectedHost, emptyFilters);
+      fetchHistory(selectedHost, emptyFilters, 1);
+    }
+  };
+  
+  const handlePageChange = (event, page) => {
+    setPagination(prev => ({ ...prev, page }));
+    if (selectedHost) {
+      fetchHistory(selectedHost, filters, page);
     }
   };
   
@@ -254,7 +294,8 @@ function App() {
                       package: ''
                     };
                     setFilters(emptyFilters);
-                    fetchHistory(host, emptyFilters);
+                    setPagination(prev => ({ ...prev, page: 1 }));
+                    fetchHistory(host, emptyFilters, 1);
                   }}
                 >
                   <ListItemText primary={host} />
@@ -363,8 +404,9 @@ function App() {
                       <>
                         <Box sx={{ mb: 1 }}>
                           <Typography variant="body2" color="text.secondary">
-                            Showing {history.length} update{history.length !== 1 ? 's' : ''}
+                            Showing {history.length} of {pagination.total} update{pagination.total !== 1 ? 's' : ''}
                             {hasActiveFilters && ' (filtered)'}
+                            {pagination.total > pagination.pageSize && ` • Page ${pagination.page} of ${Math.ceil(pagination.total / pagination.pageSize)}`}
                           </Typography>
                         </Box>
                         <TableContainer component={Paper}>
@@ -391,6 +433,21 @@ function App() {
                             </TableBody>
                           </Table>
                         </TableContainer>
+                        
+                        {/* Pagination Controls */}
+                        {pagination.total > pagination.pageSize && (
+                          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                            <Pagination
+                              count={Math.ceil(pagination.total / pagination.pageSize)}
+                              page={pagination.page}
+                              onChange={handlePageChange}
+                              color="primary"
+                              showFirstButton
+                              showLastButton
+                              size="small"
+                            />
+                          </Box>
+                        )}
                       </>
                     )}
                   </>
