@@ -110,8 +110,20 @@ def test_host_history_found(client_with_db_override):
     
     response = client_with_db_override.get("/history/history-host")
     assert response.status_code == 200
-    history = response.json()
+    data = response.json()
+    
+    # Check pagination structure
+    assert "items" in data
+    assert "total" in data
+    assert "limit" in data
+    assert "offset" in data
+    
+    history = data["items"]
     assert len(history) == 2
+    assert data["total"] == 2
+    assert data["limit"] == 50  # default limit
+    assert data["offset"] == 0  # default offset
+    
     # Check if dates are correctly parsed and present (order might not be guaranteed by default select)
     dates_in_history = {item['update_date'] for item in history}
     assert today.isoformat() in dates_in_history
@@ -170,8 +182,10 @@ def test_host_history_with_date_filters(client_with_db_override):
     # Test date_from filter
     response = client_with_db_override.get(f"/history/filter-host?date_from={yesterday.isoformat()}")
     assert response.status_code == 200
-    history = response.json()
+    data = response.json()
+    history = data["items"]
     assert len(history) == 2  # Today and yesterday
+    assert data["total"] == 2
     dates = [item['update_date'] for item in history]
     assert today.isoformat() in dates
     assert yesterday.isoformat() in dates
@@ -180,8 +194,10 @@ def test_host_history_with_date_filters(client_with_db_override):
     # Test date_to filter
     response = client_with_db_override.get(f"/history/filter-host?date_to={yesterday.isoformat()}")
     assert response.status_code == 200
-    history = response.json()
+    data = response.json()
+    history = data["items"]
     assert len(history) == 2  # Yesterday and two days ago
+    assert data["total"] == 2
     dates = [item['update_date'] for item in history]
     assert yesterday.isoformat() in dates
     assert two_days_ago.isoformat() in dates
@@ -190,8 +206,10 @@ def test_host_history_with_date_filters(client_with_db_override):
     # Test date range filter
     response = client_with_db_override.get(f"/history/filter-host?date_from={yesterday.isoformat()}&date_to={today.isoformat()}")
     assert response.status_code == 200
-    history = response.json()
+    data = response.json()
+    history = data["items"]
     assert len(history) == 2  # Today and yesterday
+    assert data["total"] == 2
     dates = [item['update_date'] for item in history]
     assert today.isoformat() in dates
     assert yesterday.isoformat() in dates
@@ -218,15 +236,19 @@ def test_host_history_with_os_filter(client_with_db_override):
     # Test OS filter
     response = client_with_db_override.get("/history/os-filter-host?os=ubuntu-20.04")
     assert response.status_code == 200
-    history = response.json()
+    data = response.json()
+    history = data["items"]
     assert len(history) == 2  # Two ubuntu packages
+    assert data["total"] == 2
     for item in history:
         assert item['os'] == 'ubuntu-20.04'
     
     response = client_with_db_override.get("/history/os-filter-host?os=centos-8")
     assert response.status_code == 200
-    history = response.json()
+    data = response.json()
+    history = data["items"]
     assert len(history) == 1  # One centos package
+    assert data["total"] == 1
     assert history[0]['os'] == 'centos-8'
 
 def test_host_history_with_package_filter(client_with_db_override):
@@ -246,8 +268,10 @@ def test_host_history_with_package_filter(client_with_db_override):
     # Test exact package name filter
     response = client_with_db_override.get("/history/pkg-filter-host?package=nginx")
     assert response.status_code == 200
-    history = response.json()
+    data = response.json()
+    history = data["items"]
     assert len(history) == 2  # nginx and nginx-common (partial match)
+    assert data["total"] == 2
     package_names = [item['name'] for item in history]
     assert 'nginx' in package_names
     assert 'nginx-common' in package_names
@@ -256,8 +280,10 @@ def test_host_history_with_package_filter(client_with_db_override):
     # Test partial package name filter
     response = client_with_db_override.get("/history/pkg-filter-host?package=apa")
     assert response.status_code == 200
-    history = response.json()
+    data = response.json()
+    history = data["items"]
     assert len(history) == 1  # apache2
+    assert data["total"] == 1
     assert history[0]['name'] == 'apache2'
 
 def test_host_history_with_combined_filters(client_with_db_override):
@@ -282,16 +308,20 @@ def test_host_history_with_combined_filters(client_with_db_override):
     # Test combining OS and package filters
     response = client_with_db_override.get("/history/combo-host?os=ubuntu&package=nginx")
     assert response.status_code == 200
-    history = response.json()
+    data = response.json()
+    history = data["items"]
     assert len(history) == 1
+    assert data["total"] == 1
     assert history[0]['os'] == 'ubuntu'
     assert history[0]['name'] == 'nginx'
     
     # Test combining date and OS filters
     response = client_with_db_override.get(f"/history/combo-host?date_from={today.isoformat()}&os=ubuntu")
     assert response.status_code == 200
-    history = response.json()
+    data = response.json()
+    history = data["items"]
     assert len(history) == 1
+    assert data["total"] == 1
     assert history[0]['os'] == 'ubuntu'
     assert history[0]['update_date'] == today.isoformat()
 
@@ -361,10 +391,127 @@ def test_report_update_with_colon_in_package_name(client_with_db_override):
     # Verify the packages were stored correctly
     response = client_with_db_override.get("/history/colon-test-host")
     assert response.status_code == 200
-    history = response.json()
+    data = response.json()
+    history = data["items"]
     assert len(history) == 3
+    assert data["total"] == 3
     
     package_names = [item['name'] for item in history]
     assert 'systemd-sysv:arm64' in package_names
     assert 'libc6:amd64' in package_names
     assert 'regular-package' in package_names
+
+def test_host_history_pagination_basic(client_with_db_override):
+    """Test basic pagination functionality."""
+    today = date.today()
+    
+    # Create test data with multiple packages
+    packages = [{"name": f"pkg{i}", "old_version": "1.0", "new_version": "1.1"} for i in range(5)]
+    client_with_db_override.post("/report", json={
+        "hostname": "pagination-host", "os": "ubuntu", "update_date": today.isoformat(),
+        "updated_packages": packages
+    })
+    
+    # Test default pagination (should return all 5 items)
+    response = client_with_db_override.get("/history/pagination-host")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["items"]) == 5
+    assert data["total"] == 5
+    assert data["limit"] == 50  # default limit
+    assert data["offset"] == 0  # default offset
+    
+    # Test with custom limit
+    response = client_with_db_override.get("/history/pagination-host?limit=3")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["items"]) == 3
+    assert data["total"] == 5
+    assert data["limit"] == 3
+    assert data["offset"] == 0
+    
+    # Test with offset
+    response = client_with_db_override.get("/history/pagination-host?limit=3&offset=2")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["items"]) == 3
+    assert data["total"] == 5
+    assert data["limit"] == 3
+    assert data["offset"] == 2
+    
+    # Test with offset beyond available data
+    response = client_with_db_override.get("/history/pagination-host?limit=3&offset=4")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["items"]) == 1  # Only 1 item remaining
+    assert data["total"] == 5
+    assert data["limit"] == 3
+    assert data["offset"] == 4
+
+def test_host_history_pagination_with_filters(client_with_db_override):
+    """Test pagination works correctly with filters."""
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+    
+    # Create test data across two days with different OS
+    for i in range(3):
+        client_with_db_override.post("/report", json={
+            "hostname": "filter-pagination-host", "os": "ubuntu", "update_date": today.isoformat(),
+            "updated_packages": [{"name": f"ubuntu-pkg{i}", "old_version": "1.0", "new_version": "1.1"}]
+        })
+    
+    for i in range(2):
+        client_with_db_override.post("/report", json={
+            "hostname": "filter-pagination-host", "os": "centos", "update_date": yesterday.isoformat(),
+            "updated_packages": [{"name": f"centos-pkg{i}", "old_version": "1.0", "new_version": "1.1"}]
+        })
+    
+    # Test pagination with OS filter
+    response = client_with_db_override.get("/history/filter-pagination-host?os=ubuntu&limit=2")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["items"]) == 2
+    assert data["total"] == 3  # 3 ubuntu packages total
+    assert data["limit"] == 2
+    assert data["offset"] == 0
+    
+    # Get the remaining ubuntu package
+    response = client_with_db_override.get("/history/filter-pagination-host?os=ubuntu&limit=2&offset=2")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["items"]) == 1
+    assert data["total"] == 3
+    assert data["limit"] == 2
+    assert data["offset"] == 2
+
+def test_host_history_pagination_validation(client_with_db_override):
+    """Test pagination parameter validation."""
+    today = date.today()
+    
+    # Create some test data
+    client_with_db_override.post("/report", json={
+        "hostname": "validation-host", "os": "ubuntu", "update_date": today.isoformat(),
+        "updated_packages": [{"name": "pkg1", "old_version": "1.0", "new_version": "1.1"}]
+    })
+    
+    # Test invalid limit (too high)
+    response = client_with_db_override.get("/history/validation-host?limit=2000")
+    assert response.status_code == 422  # Validation error
+    
+    # Test invalid limit (too low)
+    response = client_with_db_override.get("/history/validation-host?limit=0")
+    assert response.status_code == 422  # Validation error
+    
+    # Test invalid offset (negative)
+    response = client_with_db_override.get("/history/validation-host?offset=-1")
+    assert response.status_code == 422  # Validation error
+    
+    # Test valid edge cases
+    response = client_with_db_override.get("/history/validation-host?limit=1")
+    assert response.status_code == 200
+    
+    response = client_with_db_override.get("/history/validation-host?limit=1000")
+    assert response.status_code == 200
+    
+    response = client_with_db_override.get("/history/validation-host?offset=0")
+    assert response.status_code == 200

@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlmodel import SQLModel, Field, Session, create_engine, select
-from sqlalchemy import text
+from sqlalchemy import text, func
 from typing import List, Optional, Dict, Any
 from datetime import date
 import os
@@ -181,6 +181,13 @@ class ErrorResponse(SQLModel):
     """Standard error response model."""
     error: str
     detail: Optional[str] = None
+
+class PaginatedResponse(SQLModel):
+    """Response model for paginated data."""
+    items: List[PackageUpdate]
+    total: int
+    limit: int
+    offset: int
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -444,14 +451,16 @@ def list_hosts(session: Session = Depends(get_session)):
             detail="Failed to retrieve hosts"
         )
 
-@app.get("/history/{hostname}", response_model=List[PackageUpdate])
+@app.get("/history/{hostname}", response_model=PaginatedResponse)
 def host_history(
     hostname: str, 
     session: Session = Depends(get_session),
     date_from: Optional[date] = Query(None, description="Filter updates from this date (inclusive)"),
     date_to: Optional[date] = Query(None, description="Filter updates to this date (inclusive)"),
     os: Optional[str] = Query(None, description="Filter by operating system"),
-    package: Optional[str] = Query(None, description="Filter by package name (partial match)")
+    package: Optional[str] = Query(None, description="Filter by package name (partial match)"),
+    limit: int = Query(50, ge=1, le=1000, description="Number of items per page"),
+    offset: int = Query(0, ge=0, description="Number of items to skip")
 ):
     """Get update history for a specific host with optional filters."""
     try:
@@ -480,33 +489,50 @@ def host_history(
                 detail="date_from cannot be after date_to"
             )
         
-        # Build query with filters
-        query = select(PackageUpdate).where(PackageUpdate.hostname == hostname)
+        # Build base query with filters
+        base_query = select(PackageUpdate).where(PackageUpdate.hostname == hostname)
         
         if date_from:
-            query = query.where(PackageUpdate.update_date >= date_from)
+            base_query = base_query.where(PackageUpdate.update_date >= date_from)
         
         if date_to:
-            query = query.where(PackageUpdate.update_date <= date_to)
+            base_query = base_query.where(PackageUpdate.update_date <= date_to)
         
         if os:
-            query = query.where(PackageUpdate.os == os)
+            base_query = base_query.where(PackageUpdate.os == os)
         
         if package:
             # Use SQL LIKE for partial matching (case-insensitive)
-            query = query.where(PackageUpdate.name.ilike(f"%{package}%"))
+            base_query = base_query.where(PackageUpdate.name.ilike(f"%{package}%"))
         
-        query = query.order_by(PackageUpdate.update_date.desc(), PackageUpdate.id.desc())
+        # Get total count of items matching filters
+        count_query = select(func.count()).select_from(
+            base_query.subquery()
+        )
+        total = session.exec(count_query).one()
         
-        result = session.exec(query).all()
+        # Apply ordering and pagination to the main query
+        paginated_query = (
+            base_query
+            .order_by(PackageUpdate.update_date.desc(), PackageUpdate.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
         
-        if not result:
+        result = session.exec(paginated_query).all()
+        
+        if total == 0:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"No update history found for host: {hostname}"
             )
         
-        return result
+        return PaginatedResponse(
+            items=result,
+            total=total,
+            limit=limit,
+            offset=offset
+        )
         
     except HTTPException:
         raise
