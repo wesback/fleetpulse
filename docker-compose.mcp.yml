@@ -1,0 +1,52 @@
+services:
+  fleetpulse-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=file:///data/fleetpulse.db
+    volumes:
+      - fleetpulse_data:/data
+    networks:
+      - fleetpulse-network
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  fleetpulse-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    ports:
+      - "8001:8001"  # Expose HTTP port for chatbot connectivity
+    environment:
+      - FLEETPULSE_API_HOST=fleetpulse-backend
+      - FLEETPULSE_API_PORT=8000
+      - MCP_DEBUG=false
+      - MCP_MODE=http  # Run in HTTP mode for external connectivity
+      - MCP_HTTP_HOST=0.0.0.0
+      - MCP_HTTP_PORT=8001
+    depends_on:
+      fleetpulse-backend:
+        condition: service_healthy
+    networks:
+      - fleetpulse-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  fleetpulse_data:
+
+networks:
+  fleetpulse-network:
+    driver: bridge

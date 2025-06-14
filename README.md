@@ -52,6 +52,14 @@ Vibcoding for the win!
     - The **backend** runs on port **8000** (API)
     - The **frontend** runs on port **8080** (UI served by nginx)
 
+    **Optional: Launch with MCP Server for AI Integration**
+    
+    To also deploy the Model Context Protocol server for AI assistant integration:
+    
+    ```bash
+    docker compose -f docker-compose.mcp.yml up --build -d
+    ```
+
 4. **Open the dashboard:**  
    Visit [http://YOUR-HOST-IP:8080](http://YOUR-HOST-IP:8080) from any browser on your LAN.
 
@@ -407,3 +415,261 @@ The frontend tests use Jest and React Testing Library, located in `src/App.test.
    ```
 
 **Note:** The `run_tests.sh` script automatically runs both backend and frontend tests for convenience.
+
+---
+
+## MCP Server Integration
+
+FleetPulse includes a **Model Context Protocol (MCP) server** that exposes read-only API endpoints as tools for AI assistant integration. This allows AI assistants to query package update information through a standardized protocol.
+
+### What is MCP?
+
+The [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) is an open standard that enables AI models to securely connect with external data sources and tools. FleetPulse's MCP server provides read-only access to package update data, making it easy for AI assistants to help with fleet monitoring tasks.
+
+### Available MCP Tools
+
+The FleetPulse MCP server provides these tools:
+
+- **`fleetpulse_list_hosts`** - Get list of all hosts that have reported updates
+- **`fleetpulse_get_host_history`** - Get package update history for specific hosts with filtering options
+- **`fleetpulse_get_last_updates`** - Get last update dates and OS information for all hosts
+- **`fleetpulse_check_health`** - Check the health status of the FleetPulse backend
+
+### Starting the MCP Server
+
+The MCP server can run in two modes:
+1. **HTTP Mode** (recommended for chatbots and external integrations)
+2. **Stdio Mode** (for direct MCP client connections)
+
+#### Option 1: Docker Deployment (Recommended for Chatbots)
+
+1. **Start with Docker Compose** (includes both backend and MCP server in HTTP mode):
+   ```bash
+   docker compose -f docker-compose.mcp.yml up --build -d
+   ```
+
+2. **Access the MCP server via HTTP**:
+   ```bash
+   # The MCP server will be available at http://localhost:8001
+   
+   # Test health endpoint
+   curl http://localhost:8001/health
+   
+   # List all hosts
+   curl http://localhost:8001/tools/list-hosts
+   
+   # Get host history
+   curl http://localhost:8001/tools/host-history/web-server-01
+   
+   # Get last updates
+   curl http://localhost:8001/tools/last-updates
+   
+   # Check backend health
+   curl http://localhost:8001/tools/health
+   
+   # View API documentation
+   open http://localhost:8001/docs
+   ```
+
+3. **Pull pre-built images from Docker Hub**:
+   ```bash
+   # Pull individual images
+   docker pull wesback/fleetpulse-backend:latest
+   docker pull wesback/fleetpulse-mcp:latest
+   
+   # Or use them in your own docker-compose.yml
+   version: '3.8'
+   services:
+     fleetpulse-backend:
+       image: wesback/fleetpulse-backend:latest
+       ports:
+         - "8000:8000"
+     fleetpulse-mcp:
+       image: wesback/fleetpulse-mcp:latest
+       ports:
+         - "8001:8001"  # Expose HTTP port for chatbots
+       environment:
+         - FLEETPULSE_API_HOST=fleetpulse-backend
+         - MCP_MODE=http  # Enable HTTP mode
+   ```
+
+#### Option 2: Local Python Development
+
+1. **Start the FastAPI backend** (if not already running):
+   ```bash
+   cd backend
+   python main.py
+   ```
+
+2. **Install MCP dependencies**:
+   ```bash
+   cd backend
+   pip install -r fleetpulse_mcp/requirements.txt
+   ```
+
+3. **Start the MCP server** in your preferred mode:
+
+   **For chatbot integration (HTTP mode)**:
+   ```bash
+   cd backend
+   MCP_MODE=http python start_mcp_server.py
+   # Server will start on http://localhost:8001
+   ```
+   
+   **For direct MCP clients (stdio mode)**:
+   ```bash
+   cd backend
+   python start_mcp_server.py
+   # Or explicitly: MCP_MODE=stdio python start_mcp_server.py
+   ```
+
+### Configuration
+
+The MCP server can be configured using environment variables:
+
+```bash
+# FastAPI backend connection
+export FLEETPULSE_API_HOST=localhost      # Default: localhost
+export FLEETPULSE_API_PORT=8000           # Default: 8000
+
+# MCP server mode and settings
+export MCP_MODE=http                      # http or stdio (default: stdio)
+export MCP_HTTP_HOST=0.0.0.0              # Host for HTTP mode (default: 0.0.0.0)
+export MCP_HTTP_PORT=8001                 # Port for HTTP mode (default: 8001)
+export MCP_SERVER_NAME="FleetPulse MCP Server"  # Default: FleetPulse MCP Server
+export MCP_SERVER_VERSION="1.0.0"               # Default: 1.0.0
+export MCP_REQUEST_TIMEOUT=30.0                  # Default: 30.0 seconds
+export MCP_DEBUG=false                           # Default: false
+```
+
+**Mode Selection:**
+- **`MCP_MODE=http`** - Enables HTTP REST API for chatbots and external integrations
+- **`MCP_MODE=stdio`** - Enables stdio transport for direct MCP client connections
+
+### Testing MCP Tools
+
+You can test the MCP tools directly:
+
+```bash
+cd backend
+
+# Test health check
+python -c "
+import asyncio
+from fleetpulse_mcp.tools.health_tool import check_health
+print(asyncio.run(check_health()))
+"
+
+# Test host listing
+python -c "
+import asyncio
+from fleetpulse_mcp.tools.hosts_tool import list_hosts
+print(asyncio.run(list_hosts()))
+"
+
+# Test host history (replace 'hostname' with actual host)
+python -c "
+import asyncio
+from fleetpulse_mcp.tools.history_tool import get_host_history
+print(asyncio.run(get_host_history('your-hostname')))
+"
+```
+
+### Integration with AI Assistants
+
+The MCP server supports two integration methods:
+
+#### HTTP REST API (Recommended for Chatbots)
+
+Perfect for chatbots and external systems that need simple HTTP access:
+
+```bash
+# Your chatbot can make HTTP requests to:
+GET  http://localhost:8001/tools/list-hosts
+POST http://localhost:8001/tools/host-history
+GET  http://localhost:8001/tools/host-history/{hostname}  
+GET  http://localhost:8001/tools/last-updates
+GET  http://localhost:8001/tools/health
+
+# API documentation available at:
+GET  http://localhost:8001/docs
+```
+
+**Example chatbot integration:**
+```python
+import httpx
+
+# Get list of hosts
+response = httpx.get("http://localhost:8001/tools/list-hosts")
+hosts = response.json()
+
+# Get history for a specific host
+response = httpx.get("http://localhost:8001/tools/host-history/web-server-01?package=nginx")
+history = response.json()
+```
+
+#### MCP Protocol (For MCP-Compatible Clients)
+
+Uses the standard MCP protocol over stdio for direct MCP client integration. Each tool returns structured JSON responses optimized for AI consumption.
+
+**Example tool usage scenarios:**
+- "Show me all hosts in the fleet" → `fleetpulse_list_hosts`
+- "Get nginx updates for web-server-01 this week" → `fleetpulse_get_host_history` with filtering
+- "Which hosts haven't updated recently?" → `fleetpulse_get_last_updates`
+- "Is the FleetPulse backend healthy?" → `fleetpulse_check_health`
+
+### MCP Server Architecture
+
+The MCP implementation follows best practices with dual transport support:
+
+```
+backend/fleetpulse_mcp/
+├── server.py              # Main MCP server (stdio mode)
+├── http_server.py         # HTTP wrapper for chatbot integration
+├── config/
+│   └── settings.py        # Configuration management
+├── tools/                 # Individual MCP tools
+│   ├── hosts_tool.py     # Host listing functionality
+│   ├── history_tool.py   # History querying with filters
+│   ├── last_updates_tool.py  # Last update information
+│   └── health_tool.py    # Health checking
+└── resources/            # Future resource implementations
+```
+
+**HTTP Endpoints (MCP_MODE=http):**
+- `GET /` - Server information and available endpoints
+- `GET /health` - HTTP server health check
+- `GET /tools/list-hosts` - Get list of all hosts
+- `POST /tools/host-history` - Get host history (with request body for complex filtering)
+- `GET /tools/host-history/{hostname}` - Get host history (simple URL parameters)
+- `GET /tools/last-updates` - Get last update dates for all hosts
+- `GET /tools/health` - Check FleetPulse backend health
+- `GET /docs` - Interactive API documentation
+
+### Limitations and Future Enhancements
+
+**Current limitations:**
+- Read-only access only (no package update reporting via MCP)
+- No authentication/authorization (planned for future releases)
+- Single FastAPI backend connection (no load balancing)
+
+**Planned enhancements:**
+- Write operations for reporting updates
+- Authentication and authorization
+- Multi-backend support
+- Streaming responses for large datasets
+- Additional filtering and search capabilities
+
+### Running Tests
+
+Test the MCP functionality:
+
+```bash
+# Run MCP integration tests (requires running FastAPI backend)
+pytest tests/backend/mcp/ -v
+
+# Run specific MCP test
+pytest tests/backend/mcp/test_mcp_integration.py::TestMCPIntegration::test_health_tool_integration -v
+```
+
+For more information about MCP, visit the [official documentation](https://modelcontextprotocol.io/).
