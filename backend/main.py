@@ -301,12 +301,14 @@ async def telemetry_middleware(request: Request, call_next):
     if hasattr(request, "path_info"):
         endpoint = request.path_info
     
-    record_request_metrics(
-        method=request.method,
-        endpoint=endpoint,
-        status_code=response.status_code,
-        duration_ms=duration_ms
-    )
+    # Skip telemetry metrics for health endpoint to reduce noise
+    if endpoint != "/health":
+        record_request_metrics(
+            method=request.method,
+            endpoint=endpoint,
+            status_code=response.status_code,
+            duration_ms=duration_ms
+        )
     
     return response
 

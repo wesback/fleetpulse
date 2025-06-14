@@ -181,6 +181,32 @@ def test_telemetry_stub_functions():
     add_baggage("test_key", "test_value")
 
 
+def test_health_endpoint_excluded_from_telemetry_metrics(client_with_db_override):
+    """Test that health endpoint is excluded from telemetry request metrics."""
+    from unittest.mock import patch, MagicMock
+    
+    # Mock the record_request_metrics function to track calls
+    with patch('backend.main.record_request_metrics') as mock_record_metrics:
+        # Call health endpoint
+        response = client_with_db_override.get("/health")
+        assert response.status_code == 200
+        
+        # Health endpoint should NOT have triggered request metrics recording
+        mock_record_metrics.assert_not_called()
+        
+        # Verify that other endpoints still trigger metrics recording
+        # Call hosts endpoint which should trigger metrics
+        response = client_with_db_override.get("/hosts")
+        assert response.status_code == 200
+        
+        # This endpoint should have triggered request metrics recording
+        mock_record_metrics.assert_called_once()
+        call_args = mock_record_metrics.call_args[1]  # Get keyword arguments
+        assert call_args["method"] == "GET"
+        assert call_args["endpoint"] == "/hosts"
+        assert call_args["status_code"] == 200
+
+
 def test_fastapi_instrumentation_integration():
     """Test that FastAPI instrumentation is properly applied to the app instance."""
     import logging
