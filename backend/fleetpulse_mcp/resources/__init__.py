@@ -1,1 +1,0 @@
-"""MCP Resources package for FleetPulse (future use)."""
