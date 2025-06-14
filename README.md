@@ -407,3 +407,142 @@ The frontend tests use Jest and React Testing Library, located in `src/App.test.
    ```
 
 **Note:** The `run_tests.sh` script automatically runs both backend and frontend tests for convenience.
+
+---
+
+## MCP Server Integration
+
+FleetPulse includes a **Model Context Protocol (MCP) server** that exposes read-only API endpoints as tools for AI assistant integration. This allows AI assistants to query package update information through a standardized protocol.
+
+### What is MCP?
+
+The [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) is an open standard that enables AI models to securely connect with external data sources and tools. FleetPulse's MCP server provides read-only access to package update data, making it easy for AI assistants to help with fleet monitoring tasks.
+
+### Available MCP Tools
+
+The FleetPulse MCP server provides these tools:
+
+- **`fleetpulse_list_hosts`** - Get list of all hosts that have reported updates
+- **`fleetpulse_get_host_history`** - Get package update history for specific hosts with filtering options
+- **`fleetpulse_get_last_updates`** - Get last update dates and OS information for all hosts
+- **`fleetpulse_check_health`** - Check the health status of the FleetPulse backend
+
+### Starting the MCP Server
+
+1. **Start the FastAPI backend** (if not already running):
+   ```bash
+   cd backend
+   python main.py
+   ```
+
+2. **Start the MCP server** in a separate terminal:
+   ```bash
+   cd backend
+   python start_mcp_server.py
+   ```
+
+   Or run it directly:
+   ```bash
+   cd backend
+   python -m fleetpulse_mcp.server
+   ```
+
+### Configuration
+
+The MCP server can be configured using environment variables:
+
+```bash
+# FastAPI backend connection
+export FLEETPULSE_API_HOST=localhost      # Default: localhost
+export FLEETPULSE_API_PORT=8000           # Default: 8000
+
+# MCP server settings
+export MCP_SERVER_NAME="FleetPulse MCP Server"  # Default: FleetPulse MCP Server
+export MCP_SERVER_VERSION="1.0.0"               # Default: 1.0.0
+export MCP_REQUEST_TIMEOUT=30.0                  # Default: 30.0 seconds
+export MCP_DEBUG=false                           # Default: false
+```
+
+### Testing MCP Tools
+
+You can test the MCP tools directly:
+
+```bash
+cd backend
+
+# Test health check
+python -c "
+import asyncio
+from fleetpulse_mcp.tools.health_tool import check_health
+print(asyncio.run(check_health()))
+"
+
+# Test host listing
+python -c "
+import asyncio
+from fleetpulse_mcp.tools.hosts_tool import list_hosts
+print(asyncio.run(list_hosts()))
+"
+
+# Test host history (replace 'hostname' with actual host)
+python -c "
+import asyncio
+from fleetpulse_mcp.tools.history_tool import get_host_history
+print(asyncio.run(get_host_history('your-hostname')))
+"
+```
+
+### Integration with AI Assistants
+
+The MCP server uses the standard MCP protocol over stdio, making it compatible with various AI assistants and MCP clients. Each tool returns structured JSON responses optimized for AI consumption.
+
+**Example tool usage scenarios:**
+- "Show me all hosts in the fleet" → `fleetpulse_list_hosts`
+- "Get nginx updates for web-server-01 this week" → `fleetpulse_get_host_history` with filtering
+- "Which hosts haven't updated recently?" → `fleetpulse_get_last_updates`
+- "Is the FleetPulse backend healthy?" → `fleetpulse_check_health`
+
+### MCP Server Architecture
+
+The MCP implementation follows best practices:
+
+```
+backend/fleetpulse_mcp/
+├── server.py              # Main MCP server
+├── config/
+│   └── settings.py        # Configuration management
+├── tools/                 # Individual MCP tools
+│   ├── hosts_tool.py     # Host listing functionality
+│   ├── history_tool.py   # History querying with filters
+│   ├── last_updates_tool.py  # Last update information
+│   └── health_tool.py    # Health checking
+└── resources/            # Future resource implementations
+```
+
+### Limitations and Future Enhancements
+
+**Current limitations:**
+- Read-only access only (no package update reporting via MCP)
+- No authentication/authorization (planned for future releases)
+- Single FastAPI backend connection (no load balancing)
+
+**Planned enhancements:**
+- Write operations for reporting updates
+- Authentication and authorization
+- Multi-backend support
+- Streaming responses for large datasets
+- Additional filtering and search capabilities
+
+### Running Tests
+
+Test the MCP functionality:
+
+```bash
+# Run MCP integration tests (requires running FastAPI backend)
+pytest tests/backend/mcp/ -v
+
+# Run specific MCP test
+pytest tests/backend/mcp/test_mcp_integration.py::TestMCPIntegration::test_health_tool_integration -v
+```
+
+For more information about MCP, visit the [official documentation](https://modelcontextprotocol.io/).
