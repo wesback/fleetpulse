@@ -1,0 +1,46 @@
+services:
+  fleetpulse-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=file:///data/fleetpulse.db
+    volumes:
+      - fleetpulse_data:/data
+    networks:
+      - fleetpulse-network
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  fleetpulse-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    environment:
+      - FLEETPULSE_API_HOST=fleetpulse-backend
+      - FLEETPULSE_API_PORT=8000
+      - MCP_DEBUG=false
+    depends_on:
+      fleetpulse-backend:
+        condition: service_healthy
+    networks:
+      - fleetpulse-network
+    # MCP server runs on stdio, so no ports needed
+    # But you can connect to it via docker exec for testing:
+    # docker exec -it <container_name> python start_mcp_server.py
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+volumes:
+  fleetpulse_data:
+
+networks:
+  fleetpulse-network:
+    driver: bridge

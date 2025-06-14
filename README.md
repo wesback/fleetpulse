@@ -52,6 +52,14 @@ Vibcoding for the win!
     - The **backend** runs on port **8000** (API)
     - The **frontend** runs on port **8080** (UI served by nginx)
 
+    **Optional: Launch with MCP Server for AI Integration**
+    
+    To also deploy the Model Context Protocol server for AI assistant integration:
+    
+    ```bash
+    docker compose -f docker-compose.mcp.yml up --build -d
+    ```
+
 4. **Open the dashboard:**  
    Visit [http://YOUR-HOST-IP:8080](http://YOUR-HOST-IP:8080) from any browser on your LAN.
 
@@ -429,13 +437,62 @@ The FleetPulse MCP server provides these tools:
 
 ### Starting the MCP Server
 
+The MCP server can be started using either Docker or directly with Python.
+
+#### Option 1: Docker Deployment (Recommended)
+
+1. **Start with Docker Compose** (includes both backend and MCP server):
+   ```bash
+   docker compose -f docker-compose.mcp.yml up --build -d
+   ```
+
+2. **Use the MCP server**:
+   ```bash
+   # Connect to the MCP server container for testing
+   docker exec -it <mcp-container-name> python start_mcp_server.py
+   
+   # Or test tools directly
+   docker exec -it <mcp-container-name> python -c "
+   import asyncio
+   from fleetpulse_mcp.tools.health_tool import check_health
+   print(asyncio.run(check_health()))
+   "
+   ```
+
+3. **Pull pre-built images from Docker Hub**:
+   ```bash
+   # Pull individual images
+   docker pull wesback/fleetpulse-backend:latest
+   docker pull wesback/fleetpulse-mcp:latest
+   
+   # Or use them in your own docker-compose.yml
+   version: '3.8'
+   services:
+     fleetpulse-backend:
+       image: wesback/fleetpulse-backend:latest
+       ports:
+         - "8000:8000"
+     fleetpulse-mcp:
+       image: wesback/fleetpulse-mcp:latest
+       environment:
+         - FLEETPULSE_API_HOST=fleetpulse-backend
+   ```
+
+#### Option 2: Local Python Development
+
 1. **Start the FastAPI backend** (if not already running):
    ```bash
    cd backend
    python main.py
    ```
 
-2. **Start the MCP server** in a separate terminal:
+2. **Install MCP dependencies**:
+   ```bash
+   cd backend
+   pip install -r fleetpulse_mcp/requirements.txt
+   ```
+
+3. **Start the MCP server** in a separate terminal:
    ```bash
    cd backend
    python start_mcp_server.py
