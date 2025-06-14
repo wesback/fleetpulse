@@ -1,0 +1,1 @@
+"""MCP Configuration package for FleetPulse."""

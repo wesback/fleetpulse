@@ -25,3 +25,6 @@ opentelemetry-exporter-jaeger==1.21.0
 # OpenTelemetry propagators 
 opentelemetry-propagator-b3==1.28.2
 opentelemetry-propagator-jaeger==1.28.2
+
+# Model Context Protocol (MCP) dependencies
+mcp==1.0.0  # FastMCP server for creating MCP tools and resources
