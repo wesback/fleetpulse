@@ -63,12 +63,32 @@ elif [ ! -f "backend/requirements.txt" ]; then
     echo "Warning: backend/requirements.txt not found. Skipping dependency installation."
 fi
 
+# Install MCP dependencies if mcp/requirements.txt exists and venv was activated
+if [ "$ACTIVATE_VENV" = true ] && [ -f "mcp/requirements.txt" ]; then
+    echo "Installing/updating dependencies from mcp/requirements.txt..."
+    pip install -r mcp/requirements.txt
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to install dependencies from mcp/requirements.txt."
+        # Deactivate if we activated it
+        if [ "$ACTIVATE_VENV" = true ] && [ -n "$VIRTUAL_ENV" ]; then
+            deactivate
+        fi
+        exit 1
+    fi
+elif [ ! -f "mcp/requirements.txt" ]; then
+    echo "Warning: mcp/requirements.txt not found. Skipping MCP dependency installation."
+fi
+
 # Set PYTHONPATH to include the project root
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 
 # Run backend tests
 echo "Running backend tests..."
 pytest -v tests/backend/
+
+# Run MCP tests
+echo "Running MCP tests..."
+pytest -v tests/mcp/
 
 # Run frontend tests
 cd frontend
