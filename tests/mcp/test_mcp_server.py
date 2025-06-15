@@ -145,10 +145,12 @@ def test_health_endpoint(mock_get_client, client, mock_backend_client):
     assert "mcp_server" in data
 
 
-@patch('mcp.client.get_backend_client')
-def test_hosts_endpoint(mock_get_client, client, mock_backend_client):
+@patch('mcp.main.tools.client')
+def test_hosts_endpoint(mock_tools_client, client, mock_backend_client):
     """Test the hosts listing endpoint.""" 
-    mock_get_client.return_value = mock_backend_client
+    # Replace the client directly
+    from mcp.main import tools
+    tools.client = mock_backend_client
     
     response = client.get("/hosts")
     assert response.status_code == 200
@@ -160,7 +162,9 @@ def test_hosts_endpoint(mock_get_client, client, mock_backend_client):
 @patch('mcp.client.get_backend_client')
 def test_host_details_endpoint(mock_get_client, client, mock_backend_client):
     """Test the host details endpoint."""
-    mock_get_client.return_value = mock_backend_client
+    # Replace the client directly
+    from mcp.main import tools
+    tools.client = mock_backend_client
     
     response = client.get("/hosts/test-host-1")
     assert response.status_code == 200
@@ -174,7 +178,9 @@ def test_host_details_endpoint(mock_get_client, client, mock_backend_client):
 @patch('mcp.client.get_backend_client')
 def test_reports_endpoint(mock_get_client, client, mock_backend_client):
     """Test the reports endpoint."""
-    mock_get_client.return_value = mock_backend_client
+    # Replace the client directly
+    from mcp.main import tools
+    tools.client = mock_backend_client
     
     response = client.get("/reports")
     assert response.status_code == 200
@@ -186,7 +192,9 @@ def test_reports_endpoint(mock_get_client, client, mock_backend_client):
 @patch('mcp.client.get_backend_client')
 def test_reports_with_hostname_filter(mock_get_client, client, mock_backend_client):
     """Test the reports endpoint with hostname filter."""
-    mock_get_client.return_value = mock_backend_client
+    # Replace the client directly
+    from mcp.main import tools
+    tools.client = mock_backend_client
     
     response = client.get("/reports?hostname=test-host-1")
     assert response.status_code == 200
@@ -198,7 +206,9 @@ def test_reports_with_hostname_filter(mock_get_client, client, mock_backend_clie
 @patch('mcp.client.get_backend_client')
 def test_packages_endpoint(mock_get_client, client, mock_backend_client):
     """Test the packages endpoint."""
-    mock_get_client.return_value = mock_backend_client
+    # Replace the client directly
+    from mcp.main import tools
+    tools.client = mock_backend_client
     
     response = client.get("/packages")
     assert response.status_code == 200
@@ -210,7 +220,9 @@ def test_packages_endpoint(mock_get_client, client, mock_backend_client):
 @patch('mcp.client.get_backend_client')
 def test_package_details_endpoint(mock_get_client, client, mock_backend_client):
     """Test the package details endpoint."""
-    mock_get_client.return_value = mock_backend_client
+    # Replace the client directly
+    from mcp.main import tools
+    tools.client = mock_backend_client
     
     response = client.get("/packages/nginx")
     assert response.status_code == 200
@@ -223,7 +235,9 @@ def test_package_details_endpoint(mock_get_client, client, mock_backend_client):
 @patch('mcp.client.get_backend_client')
 def test_statistics_endpoint(mock_get_client, client, mock_backend_client):
     """Test the fleet statistics endpoint."""
-    mock_get_client.return_value = mock_backend_client
+    # Replace the client directly
+    from mcp.main import tools
+    tools.client = mock_backend_client
     
     response = client.get("/stats")
     assert response.status_code == 200
@@ -266,7 +280,11 @@ async def test_tools_health_check():
         )
         mock_get_client.return_value = mock_client
         
-        tools = get_mcp_tools()
+        # Create fresh tools instance with mocked client
+        from mcp.tools import MCPTools
+        tools = MCPTools()
+        tools.client = mock_client
+        
         result = await tools.health_check()
         
         assert result["status"] == "healthy"

@@ -124,9 +124,10 @@ async def global_exception_handler(request, exc):
         error_code="INTERNAL_ERROR"
     )
     
-    return HTTPException(
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
         status_code=500,
-        detail=error_response.dict()
+        content=error_response.model_dump()
     )
 
 
@@ -178,7 +179,7 @@ async def list_hosts():
     last update date, and number of packages that have been updated.
     """
     hosts = await tools.list_hosts()
-    return [host.dict() for host in hosts]
+    return [host.model_dump() for host in hosts]
 
 
 @app.get("/hosts/{hostname}")
@@ -190,7 +191,7 @@ async def get_host_details(hostname: str):
     Returns detailed host information including OS, last update date, and package count.
     """
     host = await tools.get_host_details(hostname)
-    return host.dict()
+    return host.model_dump()
 
 
 @app.get("/reports")
@@ -206,7 +207,7 @@ async def get_update_reports(
     Returns list of update reports with package details grouped by host and date.
     """
     reports = await tools.get_update_reports(hostname=hostname, limit=limit, offset=offset)
-    return [report.dict() for report in reports]
+    return [report.model_dump() for report in reports]
 
 
 @app.get("/reports/{hostname}")
@@ -222,7 +223,7 @@ async def get_host_reports(
     Returns list of update reports for the specified host.
     """
     reports = await tools.get_host_reports(hostname, limit=limit, offset=offset)
-    return [report.dict() for report in reports]
+    return [report.model_dump() for report in reports]
 
 
 @app.get("/packages")
@@ -235,7 +236,7 @@ async def list_packages():
     list of hosts that have the package, and last update date.
     """
     packages = await tools.list_packages()
-    return [package.dict() for package in packages]
+    return [package.model_dump() for package in packages]
 
 
 @app.get("/packages/{package_name}")
@@ -248,7 +249,7 @@ async def get_package_details(package_name: str):
     and last update date.
     """
     package = await tools.get_package_details(package_name)
-    return package.dict()
+    return package.model_dump()
 
 
 @app.get("/stats")
@@ -261,7 +262,7 @@ async def get_fleet_statistics():
     activity metrics, most updated packages, and recent activity.
     """
     stats = await tools.get_fleet_statistics()
-    return stats.dict()
+    return stats.model_dump()
 
 
 @app.get("/search")
@@ -276,7 +277,7 @@ async def search(
     Returns search results with relevance scores, grouped by type.
     """
     results = await tools.search(q, result_type=result_type)
-    return results.dict()
+    return results.model_dump()
 
 
 @app.get("/tools")
