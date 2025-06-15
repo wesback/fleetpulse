@@ -11,6 +11,7 @@ Vibcoding for the win!
 
 - 🚀 **FastAPI backend** with SQLite database
 - ⚡ **React frontend** with Material UI for a modern look
+- 🤖 **MCP Server**: Model Context Protocol server for AI assistant integration
 - 📦 **Works with any OS**: Includes drop-in Ansible snippets for ArchLinux and Debian/Ubuntu
 - 🐳 **Docker Compose**: One command to launch everything
 - 👀 **Zero-config UI**: Open your browser and see updates at a glance
@@ -365,6 +366,134 @@ docker compose up backend frontend
 - **Monitoring**: Set up alerts on telemetry pipeline health
 - **Security**: Ensure telemetry data doesn't include sensitive information
 - **Performance**: Monitor telemetry overhead and adjust sampling accordingly
+
+---
+
+## FleetPulse MCP Server
+
+FleetPulse includes a **Model Context Protocol (MCP) server** that provides read-only access to fleet data for AI assistants like Claude. The MCP server acts as a bridge between AI tools and the FleetPulse backend API.
+
+### Features
+
+- 🤖 **AI Assistant Integration**: Standardized MCP tools for fleet management queries
+- 🔍 **Comprehensive Search**: Search across hosts, packages, and update reports
+- 📊 **Fleet Analytics**: Aggregate statistics and activity metrics
+- 🛡️ **Robust Error Handling**: Graceful degradation when backend is unavailable
+- 📈 **OpenTelemetry Observability**: Full tracing and metrics for MCP operations
+- ⚡ **Async Performance**: Non-blocking HTTP client with connection pooling
+
+### Quick Start
+
+1. **Install MCP server dependencies**:
+   ```bash
+   cd mcp/
+   pip install -r requirements.txt
+   ```
+
+2. **Configure the MCP server**:
+   ```bash
+   export FLEETPULSE_BACKEND_URL="http://localhost:8000"
+   export MCP_PORT="8001"
+   export OTEL_ENABLE_TELEMETRY="true"
+   ```
+
+3. **Start the MCP server**:
+   ```bash
+   cd mcp/
+   python main.py
+   ```
+
+   Or using uvicorn directly:
+   ```bash
+   uvicorn mcp.main:app --host 0.0.0.0 --port 8001
+   ```
+
+### Available MCP Tools
+
+The MCP server exposes these tools for AI assistants:
+
+- **`health_check`** - Check backend and MCP server health status
+- **`list_hosts`** - List all hosts with metadata (OS, last update, package count)
+- **`get_host_details`** - Get detailed information for a specific host
+- **`get_update_reports`** - Retrieve package update reports with filtering
+- **`get_host_reports`** - Get update reports for a specific host
+- **`list_packages`** - List all packages across the fleet
+- **`get_package_details`** - Get detailed package information
+- **`get_fleet_statistics`** - Get aggregate statistics and activity metrics
+- **`search`** - Search across hosts, packages, and reports
+
+### Example AI Queries
+
+With the MCP server running, AI assistants can answer questions like:
+
+- *"Show me all hosts in the fleet and their last update times"*
+- *"What packages were updated on server-01 in the last week?"*
+- *"Which hosts have the nginx package installed?"*
+- *"What's the overall health of my FleetPulse system?"*
+- *"Search for any activity related to openssl"*
+
+### REST API Access
+
+The MCP server also provides REST endpoints for direct access:
+
+```bash
+# List available tools
+curl http://localhost:8001/tools
+
+# Health check
+curl http://localhost:8001/health
+
+# List hosts
+curl http://localhost:8001/hosts
+
+# Get host details
+curl http://localhost:8001/hosts/server-01
+
+# Search for packages
+curl "http://localhost:8001/search?q=nginx"
+
+# Get fleet statistics
+curl http://localhost:8001/stats
+```
+
+### Configuration
+
+The MCP server supports extensive configuration via environment variables:
+
+```bash
+# Backend connection
+FLEETPULSE_BACKEND_URL=http://localhost:8000
+
+# MCP server settings
+MCP_PORT=8001
+REQUEST_TIMEOUT=30.0
+MAX_RETRIES=3
+
+# OpenTelemetry (inherits from backend configuration)
+OTEL_SERVICE_NAME=fleetpulse-mcp
+OTEL_ENABLE_TELEMETRY=true
+OTEL_EXPORTER_TYPE=console  # console, jaeger, or otlp
+```
+
+### Architecture
+
+```
+┌─────────────────┐    MCP Protocol     ┌──────────────────┐    HTTP API     ┌─────────────────┐
+│   AI Assistant  │ ─────────────────▶  │  FleetPulse MCP  │ ─────────────▶ │ FleetPulse      │
+│   (Claude, etc) │                     │  Server          │                 │ Backend         │
+└─────────────────┘                     └──────────────────┘                 └─────────────────┘
+```
+
+The MCP server:
+- **Does NOT** connect directly to the database
+- **Makes HTTP requests** to the existing FleetPulse backend API
+- **Provides read-only access** - no modification operations
+- **Includes comprehensive instrumentation** with OpenTelemetry
+- **Handles errors gracefully** with retry logic and fallbacks
+
+### Documentation
+
+For detailed MCP server documentation, configuration options, and development guide, see: **[mcp/README.md](mcp/README.md)**
 
 ---
 
