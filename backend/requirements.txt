@@ -1,7 +1,7 @@
 fastapi==0.115.6
 uvicorn[standard]==0.34.0 # For running the FastAPI app
-gunicorn==21.2.0 # Production WSGI server with uvicorn workers
-sqlmodel==0.0.22
+gunicorn==22.0.0 # Production WSGI server with uvicorn workers
+sqlmodel==0.0.24
 pytest==8.3.4 # For running tests
 pytest-asyncio==0.23.6 # For async test support
 httpx==0.28.1 # For TestClient
