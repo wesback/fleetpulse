@@ -135,7 +135,9 @@ def test_tools_endpoint(client):
 @patch('mcp.client.get_backend_client')
 def test_health_endpoint(mock_get_client, client, mock_backend_client):
     """Test the health check endpoint."""
-    mock_get_client.return_value = mock_backend_client
+    # Replace the client directly
+    from mcp.main import tools
+    tools.client = mock_backend_client
     
     response = client.get("/health")
     assert response.status_code == 200
@@ -251,7 +253,9 @@ def test_statistics_endpoint(mock_get_client, client, mock_backend_client):
 @patch('mcp.client.get_backend_client')
 def test_search_endpoint(mock_get_client, client, mock_backend_client):
     """Test the search endpoint."""
-    mock_get_client.return_value = mock_backend_client
+    # Replace the client directly
+    from mcp.main import tools
+    tools.client = mock_backend_client
     
     response = client.get("/search?q=nginx")
     assert response.status_code == 200
@@ -301,7 +305,11 @@ async def test_tools_health_check_backend_down():
         mock_client.health_check.side_effect = BackendConnectionError("Connection failed")
         mock_get_client.return_value = mock_client
         
-        tools = get_mcp_tools()
+        # Create fresh tools instance with mocked client
+        from mcp.tools import MCPTools
+        tools = MCPTools()
+        tools.client = mock_client
+        
         result = await tools.health_check()
         
         assert result["status"] == "unhealthy"
