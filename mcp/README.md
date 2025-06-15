@@ -118,6 +118,22 @@ docker run -d \
   fleetpulse-mcp
 ```
 
+#### Docker Compose Mode
+
+For easy deployment alongside the FleetPulse backend, use Docker Compose:
+
+```bash
+# Using the full stack (includes MCP server)
+docker-compose up -d
+
+# Using only MCP server with existing backend
+docker-compose -f docker-compose.mcp.yml up -d
+```
+
+See the [Docker Compose Configuration](#docker-compose-configuration) section for detailed setup instructions.
+
+> **Quick Start**: For step-by-step Docker Compose setup instructions, see [DOCKER_COMPOSE_MCP.md](../DOCKER_COMPOSE_MCP.md)
+
 ## Usage
 
 ### AI Assistant Integration
@@ -368,3 +384,150 @@ export OTEL_TRACE_SAMPLE_RATE=0.1
 ## License
 
 This project is part of FleetPulse and follows the same licensing terms.
+
+## Docker Compose Configuration
+
+The MCP server can be easily deployed using Docker Compose in several configurations:
+
+### Option 1: Full FleetPulse Stack with MCP
+
+To run the complete FleetPulse stack including the MCP server, backend, frontend, and observability tools:
+
+```bash
+# From the root directory
+docker-compose up -d
+```
+
+This includes:
+- FleetPulse Backend API (port 8000)
+- FleetPulse Frontend (port 8080)
+- FleetPulse MCP Server (port 8001)
+- Jaeger Tracing UI (port 16686)
+- OpenTelemetry Collector
+
+### Option 2: MCP Server Only
+
+To run just the MCP server against an existing FleetPulse backend:
+
+```bash
+# Using the MCP-specific compose file
+docker-compose -f docker-compose.mcp.yml up -d
+```
+
+### Option 3: Pre-built Images
+
+To use pre-built images from Docker Hub:
+
+```bash
+# Using the sample compose file
+docker-compose -f docker-compose.sample.yml up -d
+```
+
+### Environment Configuration
+
+Create a `.env` file in your project root to customize the deployment:
+
+```bash
+# Backend connection
+FLEETPULSE_BACKEND_URL=http://backend:8000
+
+# MCP server settings
+MCP_PORT=8001
+REQUEST_TIMEOUT=30.0
+MAX_RETRIES=3
+
+# OpenTelemetry configuration
+OTEL_SERVICE_NAME=fleetpulse-mcp
+OTEL_SERVICE_VERSION=1.0.0
+OTEL_ENVIRONMENT=production
+OTEL_ENABLE_TELEMETRY=true
+OTEL_EXPORTER_TYPE=jaeger
+OTEL_TRACE_SAMPLE_RATE=0.1
+
+# For Jaeger tracing
+OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+
+# For OTLP tracing
+OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+```
+
+### Accessing the Services
+
+After starting with Docker Compose, the services will be available at:
+
+- **MCP Server**: http://localhost:8001
+- **Backend API**: http://localhost:8000 (if included)
+- **Frontend UI**: http://localhost:8080 (if included)
+- **Jaeger UI**: http://localhost:16686 (if included)
+
+### Health Checks
+
+Verify all services are running:
+
+```bash
+# Check MCP server health
+curl http://localhost:8001/health
+
+# Check backend health (if running)
+curl http://localhost:8000/health
+
+# Check service status
+docker-compose ps
+```
+
+### Scaling and Production Considerations
+
+For production deployments, consider:
+
+```yaml
+# In your docker-compose.override.yml
+services:
+  mcp:
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    restart: always
+    environment:
+      - OTEL_TRACE_SAMPLE_RATE=0.1  # Reduce tracing overhead
+      - REQUEST_TIMEOUT=10.0        # Faster timeouts
+```
+
+### Troubleshooting Docker Compose
+
+**Services won't start:**
+```bash
+# Check logs
+docker-compose logs mcp
+
+# Rebuild images
+docker-compose build --no-cache
+
+# Reset everything
+docker-compose down -v
+docker-compose up -d
+```
+
+**Network connectivity issues:**
+```bash
+# Test container connectivity
+docker-compose exec mcp curl http://backend:8000/health
+
+# Check network configuration
+docker network ls
+docker network inspect fleetpulse_default
+```
+
+**Resource issues:**
+```bash
+# Monitor resource usage
+docker stats
+
+# Check container health
+docker-compose ps
+```

@@ -39,6 +39,40 @@ services:
     networks:
       - fleetpulse_network
 
+  # FleetPulse MCP Server - provides AI assistant integration
+  mcp:
+    image: wesback/fleetpulse-mcp:latest
+    container_name: fleetpulse-mcp
+    ports:
+      - "8001:8001"  # MCP Server API
+    environment:
+      # Backend connection
+      - FLEETPULSE_BACKEND_URL=http://backend:8000
+      
+      # MCP server settings
+      - MCP_PORT=8001
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-30.0}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      
+      # OpenTelemetry configuration
+      - OTEL_SERVICE_NAME=fleetpulse-mcp
+      - OTEL_SERVICE_VERSION=1.0.0
+      - OTEL_ENVIRONMENT=${OTEL_ENVIRONMENT:-production}
+      - OTEL_ENABLE_TELEMETRY=${OTEL_ENABLE_TELEMETRY:-true}
+      - OTEL_EXPORTER_TYPE=${OTEL_EXPORTER_TYPE:-console}
+      - OTEL_TRACE_SAMPLE_RATE=${OTEL_TRACE_SAMPLE_RATE:-0.1}
+    depends_on:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - fleetpulse_network
+
   # Optional: Add a database service if your application requires one
   # database:
   #   image: postgres:15-alpine
@@ -80,6 +114,9 @@ networks:
 # 1. Copy this file to your deployment server
 # 2. Rename it to docker-compose.yml or use: docker-compose -f docker-compose.sample.yml up
 # 3. Update environment variables and port mappings as needed
-# 4. Create a .env file for sensitive configuration values
+# 4. Create a .env file for sensitive configuration values (see .env.mcp.sample)
 # 5. Run: docker-compose up -d
-# 6. Access the application at http://localhost:8080 (frontend) and http://localhost:8000 (API)
+# 6. Access the services:
+#    - Frontend UI: http://localhost:8080
+#    - Backend API: http://localhost:8000
+#    - MCP Server: http://localhost:8001

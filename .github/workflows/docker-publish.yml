@@ -16,16 +16,24 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-
       - name: Install backend dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
+      - name: Install MCP dependencies
+        run: |
+          pip install -r mcp/requirements.txt
+
       - name: Run backend tests
         run: |
           export PYTHONPATH="${PYTHONPATH}:$(pwd)/backend"
           pytest tests/backend -v
+
+      - name: Run MCP tests
+        run: |
+          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+          pytest tests/mcp -v
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -73,3 +81,11 @@ jobs:
           file: Dockerfile.frontend
           push: true
           tags: wesback/fleetpulse-frontend:latest
+
+      - name: Build and push MCP server image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.mcp
+          push: true
+          tags: wesback/fleetpulse-mcp:latest
