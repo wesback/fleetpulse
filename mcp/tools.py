@@ -47,7 +47,7 @@ class MCPTools:
                 health = await self.client.health_check()
                 
                 # Add timestamp and additional MCP server info
-                result = health.dict()
+                result = health.model_dump()
                 result["mcp_server"] = {
                     "status": "healthy",
                     "backend_connected": True
@@ -533,7 +533,7 @@ class MCPTools:
                             if query_lower in host.hostname.lower() or query_lower in host.os.lower():
                                 results.append(SearchResult(
                                     result_type="host",
-                                    data=host.dict(),
+                                    data=host.model_dump(),
                                     relevance_score=1.0 if query_lower == host.hostname.lower() else 0.8
                                 ))
                     except Exception as e:
@@ -547,7 +547,7 @@ class MCPTools:
                             if query_lower in package.name.lower():
                                 results.append(SearchResult(
                                     result_type="package",
-                                    data=package.dict(),
+                                    data=package.model_dump(),
                                     relevance_score=1.0 if query_lower == package.name.lower() else 0.8
                                 ))
                     except Exception as e:
@@ -572,7 +572,7 @@ class MCPTools:
                             if match_score > 0:
                                 results.append(SearchResult(
                                     result_type="report",
-                                    data=report.dict(),
+                                    data=report.model_dump(),
                                     relevance_score=match_score
                                 ))
                     except Exception as e:
