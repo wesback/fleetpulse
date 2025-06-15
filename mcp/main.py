@@ -11,8 +11,11 @@ import time
 from contextlib import asynccontextmanager
 from typing import Dict, Any, List, Optional
 
-from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi import FastAPI, HTTPException, Query, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sse_starlette.sse import EventSourceResponse
+import json
 
 from .config import get_config, validate_config
 from .telemetry import (
@@ -124,7 +127,6 @@ async def global_exception_handler(request, exc):
         error_code="INTERNAL_ERROR"
     )
     
-    from fastapi.responses import JSONResponse
     return JSONResponse(
         status_code=500,
         content=error_response.model_dump()
@@ -337,6 +339,38 @@ async def list_tools():
             }
         ]
     }
+
+
+@app.post("/sse")
+async def sse_endpoint(request: Request):
+    """
+    SSE Endpoint for Claude Desktop integration.
+    Accepts POST requests with JSON specifying the tool and parameters, invokes the tool, and streams the result as SSE.
+    Example request body:
+    {
+        "tool": "list_hosts",
+        "params": {}
+    }
+    """
+    try:
+        data = await request.json()
+        tool_name = data.get("tool")
+        params = data.get("params", {})
+        if not tool_name or not hasattr(tools, tool_name):
+            return JSONResponse(status_code=400, content={"error": "Invalid or missing tool name"})
+        tool_func = getattr(tools, tool_name)
+        # Call the tool function with params
+        result = await tool_func(**params) if params else await tool_func()
+        # Stream the result as SSE (single event for now)
+        async def event_generator():
+            yield {
+                "event": "result",
+                "data": json.dumps(result, default=str)
+            }
+        return EventSourceResponse(event_generator())
+    except Exception as e:
+        logger.error(f"SSE endpoint error: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 if __name__ == "__main__":

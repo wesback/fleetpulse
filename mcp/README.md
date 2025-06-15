@@ -743,3 +743,55 @@ docker stats
 # Check container health
 docker-compose ps
 ```
+
+## SSE Endpoint for Claude Desktop
+
+The MCP server now provides an SSE endpoint for integration with Claude Desktop or other AI assistants that require Server-Sent Events.
+
+### Endpoint
+
+- **POST /sse**
+- Accepts: JSON body specifying the tool and parameters
+- Streams: Result as SSE (Server-Sent Events)
+
+#### Example Request
+
+```
+POST /sse
+Content-Type: application/json
+
+{
+  "tool": "list_hosts",
+  "params": {}
+}
+```
+
+#### Example SSE Response
+
+```
+event: result
+data: [{"hostname": "server-01", "os": "Ubuntu", ...}, ...]
+
+```
+
+### Claude Desktop Integration
+
+To use the MCP server with Claude Desktop in remote (SSE) mode, configure your Claude Desktop MCP config as follows:
+
+```
+{
+  "mcpServers": {
+    "fleetpulse": {
+      "command": "stdio",
+      "transport": {
+        "type": "sse",
+        "url": "http://your-mcp-server:8001/sse"
+      },
+      "env": {}
+    }
+  }
+}
+```
+
+- The MCP server must be accessible from the Claude Desktop host.
+- The /sse endpoint now supports POST requests with tool invocation.

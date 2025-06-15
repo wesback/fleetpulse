@@ -7,6 +7,7 @@ httpx[all]==0.28.1
 pydantic==2.11.7
 pydantic-settings==2.9.1
 uvicorn[standard]==0.34.0
+sse-starlette==1.6.5
 
 # OpenTelemetry core packages
 opentelemetry-api==1.28.2
