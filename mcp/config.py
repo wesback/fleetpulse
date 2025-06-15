@@ -6,100 +6,60 @@ Handles environment variables and configuration validation.
 
 import os
 from typing import Optional
-from pydantic import BaseSettings, Field
+from dataclasses import dataclass
 
 
-class MCPConfig(BaseSettings):
+@dataclass
+class MCPConfig:
     """MCP Server configuration from environment variables."""
     
     # Backend connection
-    fleetpulse_backend_url: str = Field(
-        default="http://localhost:8000",
-        env="FLEETPULSE_BACKEND_URL",
-        description="URL of the FleetPulse backend API"
-    )
+    fleetpulse_backend_url: str = "http://localhost:8000"
     
     # MCP server settings
-    mcp_port: int = Field(
-        default=8001,
-        env="MCP_PORT", 
-        description="Port for the MCP server"
-    )
+    mcp_port: int = 8001
     
     # HTTP client settings
-    request_timeout: float = Field(
-        default=30.0,
-        env="REQUEST_TIMEOUT",
-        description="Timeout for backend API requests in seconds"
-    )
-    
-    max_retries: int = Field(
-        default=3,
-        env="MAX_RETRIES",
-        description="Maximum number of retry attempts for backend requests"
-    )
+    request_timeout: float = 30.0
+    max_retries: int = 3
     
     # OpenTelemetry configuration  
-    otel_service_name: str = Field(
-        default="fleetpulse-mcp",
-        env="OTEL_SERVICE_NAME",
-        description="OpenTelemetry service name"
-    )
-    
-    otel_service_version: str = Field(
-        default="1.0.0", 
-        env="OTEL_SERVICE_VERSION",
-        description="OpenTelemetry service version"
-    )
-    
-    otel_environment: str = Field(
-        default="development",
-        env="OTEL_ENVIRONMENT", 
-        description="OpenTelemetry environment"
-    )
-    
-    otel_enable_telemetry: bool = Field(
-        default=True,
-        env="OTEL_ENABLE_TELEMETRY",
-        description="Enable OpenTelemetry instrumentation"
-    )
-    
-    otel_exporter_type: str = Field(
-        default="console",
-        env="OTEL_EXPORTER_TYPE",
-        description="OpenTelemetry exporter type (console, jaeger, otlp)"
-    )
-    
-    otel_exporter_otlp_endpoint: Optional[str] = Field(
-        default=None,
-        env="OTEL_EXPORTER_OTLP_ENDPOINT",
-        description="OTLP exporter endpoint"
-    )
-    
-    otel_exporter_jaeger_endpoint: str = Field(
-        default="http://jaeger:14268/api/traces",
-        env="OTEL_EXPORTER_JAEGER_ENDPOINT", 
-        description="Jaeger exporter endpoint"
-    )
-    
-    otel_trace_sample_rate: float = Field(
-        default=1.0,
-        env="OTEL_TRACE_SAMPLE_RATE",
-        description="OpenTelemetry trace sampling rate"
-    )
+    otel_service_name: str = "fleetpulse-mcp"
+    otel_service_version: str = "1.0.0"
+    otel_environment: str = "development"
+    otel_enable_telemetry: bool = True
+    otel_exporter_type: str = "console"
+    otel_exporter_otlp_endpoint: Optional[str] = None
+    otel_exporter_jaeger_endpoint: str = "http://jaeger:14268/api/traces"
+    otel_trace_sample_rate: float = 1.0
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    def __post_init__(self):
+        """Load values from environment variables."""
+        self.fleetpulse_backend_url = os.getenv("FLEETPULSE_BACKEND_URL", self.fleetpulse_backend_url)
+        self.mcp_port = int(os.getenv("MCP_PORT", str(self.mcp_port)))
+        self.request_timeout = float(os.getenv("REQUEST_TIMEOUT", str(self.request_timeout)))
+        self.max_retries = int(os.getenv("MAX_RETRIES", str(self.max_retries)))
+        
+        self.otel_service_name = os.getenv("OTEL_SERVICE_NAME", self.otel_service_name)
+        self.otel_service_version = os.getenv("OTEL_SERVICE_VERSION", self.otel_service_version)
+        self.otel_environment = os.getenv("OTEL_ENVIRONMENT", self.otel_environment)
+        self.otel_enable_telemetry = os.getenv("OTEL_ENABLE_TELEMETRY", "true").lower() == "true"
+        self.otel_exporter_type = os.getenv("OTEL_EXPORTER_TYPE", self.otel_exporter_type)
+        self.otel_exporter_otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", self.otel_exporter_otlp_endpoint)
+        self.otel_exporter_jaeger_endpoint = os.getenv("OTEL_EXPORTER_JAEGER_ENDPOINT", self.otel_exporter_jaeger_endpoint)
+        self.otel_trace_sample_rate = float(os.getenv("OTEL_TRACE_SAMPLE_RATE", str(self.otel_trace_sample_rate)))
 
 
 # Global configuration instance
-config = MCPConfig()
+_config: Optional[MCPConfig] = None
 
 
 def get_config() -> MCPConfig:
     """Get the current configuration."""
-    return config
+    global _config
+    if _config is None:
+        _config = MCPConfig()
+    return _config
 
 
 def validate_config() -> None:
