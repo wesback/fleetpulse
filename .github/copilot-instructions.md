@@ -36,7 +36,7 @@
 
 ## Language-Specific Guidelines
 - **Python**: Follow PEP 8, use type hints, leverage context managers for resource handling
-  - Leverage FastAPI’s dependency injection for authentication and authorization
+  - Leverage FastAPI’s dependency injection for authentication and authorization, use a virtual environment
 - **JavaScript/TypeScript**: Use modern ES6+ features, prefer TypeScript for type safety, implement proper async/await handling
 - **Java**: Follow Oracle conventions, use appropriate access modifiers, implement proper exception handling
 - **C#**: Follow Microsoft conventions, use LINQ appropriately, implement proper disposal patterns
