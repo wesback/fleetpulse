@@ -193,6 +193,218 @@ curl "http://localhost:8001/search?q=nginx&result_type=package"
 curl http://localhost:8001/tools
 ```
 
+## Claude Desktop Integration
+
+To integrate the FleetPulse MCP server with Claude Desktop, you need to configure Claude Desktop to connect to your MCP server.
+
+### Prerequisites
+
+1. **Claude Desktop App**: Download and install Claude Desktop from [Anthropic's website](https://claude.ai/download)
+2. **FleetPulse MCP Server**: Ensure your MCP server is running and accessible
+3. **Network Access**: Claude Desktop must be able to reach your MCP server
+
+### Configuration Steps
+
+#### 1. Locate Claude Desktop Configuration
+
+Find your Claude Desktop configuration file:
+
+**Windows:**
+```
+%APPDATA%\Claude\claude_desktop_config.json
+```
+
+**macOS:**
+```
+~/Library/Application Support/Claude/claude_desktop_config.json
+```
+
+**Linux:**
+```
+~/.config/Claude/claude_desktop_config.json
+```
+
+#### 2. Configure MCP Server Connection
+
+Edit the `claude_desktop_config.json` file to add the FleetPulse MCP server:
+
+```json
+{
+  "mcpServers": {
+    "fleetpulse": {
+      "command": "python",
+      "args": ["-m", "mcp.main"],
+      "cwd": "/path/to/your/fleetpulse/mcp",
+      "env": {
+        "FLEETPULSE_BACKEND_URL": "http://localhost:8000",
+        "MCP_PORT": "8001",
+        "REQUEST_TIMEOUT": "30.0",
+        "MAX_RETRIES": "3",
+        "OTEL_ENABLE_TELEMETRY": "false"
+      }
+    }
+  }
+}
+```
+
+#### 3. Alternative: Remote MCP Server Configuration
+
+If your MCP server is running on a remote host or via Docker, configure it as a remote server:
+
+```json
+{
+  "mcpServers": {
+    "fleetpulse": {
+      "command": "stdio",
+      "transport": {
+        "type": "sse",
+        "url": "http://your-mcp-server:8001/sse"
+      },
+      "env": {}
+    }
+  }
+}
+```
+
+#### 4. Docker-based Configuration
+
+For Docker deployments, you can configure Claude Desktop to run the MCP server in a container:
+
+```json
+{
+  "mcpServers": {
+    "fleetpulse": {
+      "command": "docker",
+      "args": [
+        "run", 
+        "--rm", 
+        "-i",
+        "--network", "fleetpulse_default",
+        "-e", "FLEETPULSE_BACKEND_URL=http://backend:8000",
+        "fleetpulse-mcp:latest",
+        "python", "-m", "mcp.main"
+      ],
+      "env": {}
+    }
+  }
+}
+```
+
+### Environment Variables
+
+Configure these environment variables for optimal Claude Desktop integration:
+
+```bash
+# Required: Backend connection
+FLEETPULSE_BACKEND_URL=http://localhost:8000
+
+# Optional: Performance tuning
+REQUEST_TIMEOUT=15.0
+MAX_RETRIES=2
+
+# Optional: Disable telemetry for Claude Desktop usage
+OTEL_ENABLE_TELEMETRY=false
+
+# Optional: Logging configuration
+LOG_LEVEL=INFO
+```
+
+### Verification Steps
+
+1. **Start the MCP Server**:
+   ```bash
+   cd mcp/
+   python main.py
+   ```
+
+2. **Restart Claude Desktop**: Close and reopen Claude Desktop to load the new configuration
+
+3. **Verify Connection**: In Claude Desktop, try asking questions about your fleet:
+   - "Show me all hosts in my fleet"
+   - "What packages need updates?"
+   - "Check the health of my FleetPulse system"
+
+4. **Check MCP Tools**: Claude should now have access to FleetPulse tools:
+   - `health_check`
+   - `list_hosts`
+   - `get_host_details`
+   - `list_packages`
+   - `get_package_details`
+   - `get_reports`
+   - `get_host_reports`
+   - `get_fleet_stats`
+   - `search`
+
+### Troubleshooting Claude Desktop Integration
+
+**MCP Server Not Found:**
+```bash
+# Verify Python path and dependencies
+which python
+pip list | grep mcp
+
+# Check configuration file syntax
+python -m json.tool ~/.config/Claude/claude_desktop_config.json
+```
+
+**Connection Issues:**
+```bash
+# Test MCP server accessibility
+curl http://localhost:8001/health
+
+# Check Claude Desktop logs (varies by OS)
+# Windows: %APPDATA%\Claude\logs\
+# macOS: ~/Library/Logs/Claude/
+# Linux: ~/.local/share/Claude/logs/
+```
+
+**Permission Issues:**
+```bash
+# Ensure Claude Desktop can execute Python
+# Check file permissions on MCP directory
+chmod +x /path/to/fleetpulse/mcp/main.py
+```
+
+**Docker Network Issues:**
+```bash
+# Verify Docker network connectivity
+docker network ls
+docker network inspect fleetpulse_default
+
+# Test container connectivity
+docker run --rm --network fleetpulse_default curlimages/curl curl http://backend:8000/health
+```
+
+### Security Considerations for Claude Desktop
+
+- **Local Execution**: When running locally, ensure your MCP server only accepts local connections
+- **Authentication**: Consider implementing authentication if exposing the MCP server to external networks
+- **Firewall Rules**: Configure appropriate firewall rules to restrict access to the MCP server
+- **Environment Variables**: Avoid storing sensitive credentials in the Claude Desktop configuration file
+
+### Performance Optimization for Claude Desktop
+
+For optimal performance with Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "fleetpulse": {
+      "command": "python",
+      "args": ["-m", "mcp.main"],
+      "cwd": "/path/to/your/fleetpulse/mcp",
+      "env": {
+        "FLEETPULSE_BACKEND_URL": "http://localhost:8000",
+        "REQUEST_TIMEOUT": "10.0",
+        "MAX_RETRIES": "2",
+        "OTEL_ENABLE_TELEMETRY": "false",
+        "LOG_LEVEL": "WARNING"
+      }
+    }
+  }
+}
+```
+
 ## Observability
 
 ### OpenTelemetry Metrics
