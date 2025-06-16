@@ -10,7 +10,9 @@ from typing import Optional
 from contextlib import contextmanager
 
 from opentelemetry import trace, metrics, baggage
-from opentelemetry.sdk.trace import TracerProvider, Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace.sampling import TraceIdRatioBased
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader, ConsoleMetricExporter
@@ -61,10 +63,11 @@ def setup_tracing():
     resource = setup_resource()
     
     # Create tracer provider
-    trace.set_tracer_provider(TracerProvider(
+    provider = TracerProvider(
         resource=resource,
-        sampler=trace.TraceIdRatioBased(config.otel_trace_sample_rate)
-    ))
+        sampler=TraceIdRatioBased(config.otel_trace_sample_rate)
+    )
+    trace.set_tracer_provider(provider)
     
     # Choose exporter based on configuration
     exporter_type = config.otel_exporter_type.lower()
@@ -83,7 +86,7 @@ def setup_tracing():
     
     # Add span processor
     span_processor = BatchSpanProcessor(exporter)
-    trace.get_tracer_provider().add_span_processor(span_processor)
+    provider.add_span_processor(span_processor)
     
     # Set up propagators
     set_global_textmap(B3MultiFormat())
@@ -162,13 +165,8 @@ def shutdown_telemetry():
     """Shutdown OpenTelemetry components."""
     logger.info("Shutting down OpenTelemetry...")
     
-    # Shutdown tracer provider
-    if hasattr(trace.get_tracer_provider(), 'shutdown'):
-        trace.get_tracer_provider().shutdown()
-    
-    # Shutdown meter provider  
-    if hasattr(metrics.get_meter_provider(), 'shutdown'):
-        metrics.get_meter_provider().shutdown()
+    # OpenTelemetry 1.28.2: TracerProvider and MeterProvider do not require explicit shutdown.
+    # Telemetry is flushed automatically on process exit. No action required here.
 
 
 @contextmanager
