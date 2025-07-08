@@ -89,6 +89,10 @@ const StatisticsPage = () => {
     );
   }
 
+  if (!statistics) {
+    return null;
+  }
+
   // Chart color schemes based on theme
   const chartColors = {
     primary: theme.palette.primary.main,
@@ -225,7 +229,7 @@ const StatisticsPage = () => {
       
       {/* Summary Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
@@ -237,7 +241,7 @@ const StatisticsPage = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
@@ -249,7 +253,7 @@ const StatisticsPage = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
@@ -264,7 +268,7 @@ const StatisticsPage = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
@@ -286,7 +290,7 @@ const StatisticsPage = () => {
       {/* Charts */}
       <Grid container spacing={3}>
         {/* Updates Timeline */}
-        <Grid item xs={12} lg={8}>
+        <Grid size={{ xs: 12, lg: 8 }}>
           <Paper elevation={2} sx={{ p: 2, height: 400 }}>
             <Typography variant="h6" gutterBottom>
               Updates Timeline (Last 30 Days)
@@ -298,7 +302,7 @@ const StatisticsPage = () => {
         </Grid>
 
         {/* OS Distribution */}
-        <Grid item xs={12} lg={4}>
+        <Grid size={{ xs: 12, lg: 4 }}>
           <Paper elevation={2} sx={{ p: 2, height: 400 }}>
             <Typography variant="h6" gutterBottom>
               Updates by Operating System
@@ -310,7 +314,7 @@ const StatisticsPage = () => {
         </Grid>
 
         {/* Top Packages */}
-        <Grid item xs={12} lg={6}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <Paper elevation={2} sx={{ p: 2, height: 400 }}>
             <Typography variant="h6" gutterBottom>
               Most Updated Packages
@@ -322,7 +326,7 @@ const StatisticsPage = () => {
         </Grid>
 
         {/* Host Activity */}
-        <Grid item xs={12} lg={6}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <Paper elevation={2} sx={{ p: 2, height: 400 }}>
             <Typography variant="h6" gutterBottom>
               Most Active Hosts

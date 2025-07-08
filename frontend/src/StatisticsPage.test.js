@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
 import axios from 'axios';
 import StatisticsPage from './StatisticsPage';
 
@@ -45,11 +46,16 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // Test wrapper with theme provider
-const TestWrapper = ({ children }) => (
-  <BrowserRouter>
-    {children}
-  </BrowserRouter>
-);
+const TestWrapper = ({ children }) => {
+  const theme = createTheme();
+  return (
+    <BrowserRouter>
+      <ThemeProvider theme={theme}>
+        {children}
+      </ThemeProvider>
+    </BrowserRouter>
+  );
+};
 
 describe('StatisticsPage', () => {
   beforeEach(() => {
@@ -133,11 +139,38 @@ describe('StatisticsPage', () => {
 
     axios.get.mockResolvedValueOnce({ data: mockData });
     
-    render(
+    const { container } = render(
       <TestWrapper>
         <StatisticsPage />
       </TestWrapper>
     );
+    
+    await waitFor(() => {
+      // First check if basic title is rendered
+      expect(screen.getByText('Fleet Statistics')).toBeInTheDocument();
+    });
+    
+    // Add debugging
+    console.log('=== COMPONENT HTML DEBUG ===');
+    console.log(container.innerHTML);
+    console.log('=== END DEBUG ===');
+    
+    // Look for total hosts element
+    const totalHostsElement = screen.queryByText('Total Hosts');
+    console.log('Total Hosts element found:', !!totalHostsElement);
+    
+    if (!totalHostsElement) {
+      // List all text content in the component
+      const allText = container.textContent;
+      console.log('All text content:', allText);
+      
+      // Look for any card-like elements
+      const cards = container.querySelectorAll('[class*="Card"], [class*="card"]');
+      console.log('Number of card elements found:', cards.length);
+      cards.forEach((card, index) => {
+        console.log(`Card ${index}:`, card.textContent);
+      });
+    }
     
     await waitFor(() => {
       // Check summary cards
