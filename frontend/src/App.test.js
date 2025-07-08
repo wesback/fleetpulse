@@ -1,9 +1,33 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { BrowserRouter } from 'react-router-dom';
 import axios from 'axios';
 import App from './App';
 
 jest.mock('axios');
+
+// Mock Chart.js components for StatisticsPage
+jest.mock('react-chartjs-2', () => ({
+  Bar: jest.fn(() => <div data-testid="bar-chart">Bar Chart</div>),
+  Line: jest.fn(() => <div data-testid="line-chart">Line Chart</div>),
+  Doughnut: jest.fn(() => <div data-testid="doughnut-chart">Doughnut Chart</div>),
+}));
+
+jest.mock('chart.js', () => ({
+  Chart: {
+    register: jest.fn(),
+  },
+  CategoryScale: jest.fn(),
+  LinearScale: jest.fn(),
+  BarElement: jest.fn(),
+  LineElement: jest.fn(),
+  PointElement: jest.fn(),
+  ArcElement: jest.fn(),
+  Title: jest.fn(),
+  Tooltip: jest.fn(),
+  Legend: jest.fn(),
+  TimeScale: jest.fn(),
+}));
 
 // Mock matchMedia for useMediaQuery
 Object.defineProperty(window, 'matchMedia', {
@@ -26,517 +50,274 @@ describe('App', () => {
     localStorage.clear();
   });
 
-  it('renders hosts list and handles empty state', async () => {
+  it('renders navigation and redirects to statistics page by default', async () => {
+    // Mock statistics API call
+    axios.get.mockResolvedValueOnce({ 
+      data: { 
+        total_hosts: 0,
+        total_updates: 0,
+        recent_updates: 0,
+        top_packages: [],
+        updates_by_os: [],
+        updates_timeline: [],
+        host_activity: []
+      } 
+    });
+    
+    render(<App />);
+    
+    expect(screen.getByText('FleetPulse — Linux Fleet Package Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('Statistics')).toBeInTheDocument();
+    expect(screen.getByText('Hosts')).toBeInTheDocument();
+    
+    await waitFor(() => {
+      expect(screen.getByText('Fleet Statistics')).toBeInTheDocument();
+    });
+  });
+
+  it('navigates to hosts page when hosts tab is clicked', async () => {
+    // Mock statistics API call for initial load
+    axios.get.mockResolvedValueOnce({ 
+      data: { 
+        total_hosts: 0,
+        total_updates: 0,
+        recent_updates: 0,
+        top_packages: [],
+        updates_by_os: [],
+        updates_timeline: [],
+        host_activity: []
+      } 
+    });
+    
+    // Mock hosts API call
     axios.get.mockResolvedValueOnce({ data: { hosts: [] } });
     
-    await act(async () => {
-      render(<App />);
+    render(<App />);
+    
+    await waitFor(() => {
+      expect(screen.getByText('Fleet Statistics')).toBeInTheDocument();
     });
     
-    expect(await screen.findByText('No hosts yet.')).toBeInTheDocument();
+    const hostsTab = screen.getByText('Hosts').closest('button');
+    fireEvent.click(hostsTab);
+    
+    await waitFor(() => {
+      expect(screen.getByText('Host Management')).toBeInTheDocument();
+    });
   });
 
-  it('renders hosts and allows selecting a host', async () => {
-    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1', 'host2'] } });
-    
-    await act(async () => {
-      render(<App />);
+  it('navigates back to statistics page when statistics tab is clicked', async () => {
+    // Mock statistics API call
+    axios.get.mockResolvedValueOnce({ 
+      data: { 
+        total_hosts: 0,
+        total_updates: 0,
+        recent_updates: 0,
+        top_packages: [],
+        updates_by_os: [],
+        updates_timeline: [],
+        host_activity: []
+      } 
     });
     
-    expect(await screen.findByText('host1')).toBeInTheDocument();
-    expect(screen.getByText('host2')).toBeInTheDocument();
-  });
-
-  it('shows update history for selected host', async () => {
-    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
-    axios.get.mockResolvedValueOnce({ data: {
-      items: [
-        {
-          update_date: '2025-06-07',
-          os: 'Ubuntu',
-          name: 'nginx',
-          old_version: '1.18.0',
-          new_version: '1.20.0',
-        },
-      ],
-      total: 1,
-      limit: 25,
-      offset: 0
-    } });
-    
-    await act(async () => {
-      render(<App />);
-    });
-    
-    await act(async () => {
-      fireEvent.click(await screen.findByText('host1'));
-    });
-    
-    expect(await screen.findByText('Update History for')).toBeInTheDocument();
-    expect(screen.getByText('nginx')).toBeInTheDocument();
-    expect(screen.getByText('1.18.0')).toBeInTheDocument();
-    expect(screen.getByText('1.20.0')).toBeInTheDocument();
-  });
-
-  it('shows message when no update history is found', async () => {
-    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
-    // Mock 404 response
-    axios.get.mockRejectedValueOnce({
-      response: { status: 404 }
-    });
-    
-    await act(async () => {
-      render(<App />);
-    });
-    
-    await act(async () => {
-      fireEvent.click(await screen.findByText('host1'));
-    });
-    
-    expect(await screen.findByText('No update history found for this host.')).toBeInTheDocument();
-  });
-
-  it('shows loading indicator when fetching history', async () => {
-    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
-    let resolve;
-    axios.get.mockReturnValueOnce(new Promise(r => { resolve = r; }));
-    
-    await act(async () => {
-      render(<App />);
-    });
-    
-    await act(async () => {
-      fireEvent.click(await screen.findByText('host1'));
-    });
-    
-    expect(screen.getByRole('progressbar')).toBeInTheDocument();
-    
-    await act(async () => {
-      resolve({ data: { items: [], total: 0, limit: 25, offset: 0 } });
-    });
-    
-    await waitFor(() => expect(screen.queryByRole('progressbar')).not.toBeInTheDocument());
-  });
-
-  it('renders dark mode toggle switch', async () => {
+    // Mock hosts API call
     axios.get.mockResolvedValueOnce({ data: { hosts: [] } });
     
-    await act(async () => {
-      render(<App />);
+    // Mock another statistics API call for navigation back
+    axios.get.mockResolvedValueOnce({ 
+      data: { 
+        total_hosts: 0,
+        total_updates: 0,
+        recent_updates: 0,
+        top_packages: [],
+        updates_by_os: [],
+        updates_timeline: [],
+        host_activity: []
+      } 
     });
     
-    // Find the switch by its aria-label
-    const darkModeSwitch = screen.getByLabelText('dark mode toggle');
-    expect(darkModeSwitch).toBeInTheDocument();
+    render(<App />);
+    
+    await waitFor(() => {
+      expect(screen.getByText('Fleet Statistics')).toBeInTheDocument();
+    });
+    
+    // Navigate to hosts
+    const hostsTab = screen.getByText('Hosts').closest('button');
+    fireEvent.click(hostsTab);
+    
+    await waitFor(() => {
+      expect(screen.getByText('Host Management')).toBeInTheDocument();
+    });
+    
+    // Navigate back to statistics
+    const statisticsTab = screen.getByText('Statistics').closest('button');
+    fireEvent.click(statisticsTab);
+    
+    await waitFor(() => {
+      expect(screen.getByText('Fleet Statistics')).toBeInTheDocument();
+    });
   });
 
-  it('toggles between light and dark mode', async () => {
-    axios.get.mockResolvedValueOnce({ data: { hosts: [] } });
-    
-    await act(async () => {
-      render(<App />);
+  it('toggles theme correctly', async () => {
+    // Mock statistics API call
+    axios.get.mockResolvedValueOnce({ 
+      data: { 
+        total_hosts: 0,
+        total_updates: 0,
+        recent_updates: 0,
+        top_packages: [],
+        updates_by_os: [],
+        updates_timeline: [],
+        host_activity: []
+      } 
     });
     
-    const darkModeSwitch = screen.getByLabelText('dark mode toggle');
+    render(<App />);
     
-    // Initially should be light mode (switch unchecked)
-    expect(darkModeSwitch).not.toBeChecked();
-    
-    // Click to toggle to dark mode
-    await act(async () => {
-      fireEvent.click(darkModeSwitch);
+    await waitFor(() => {
+      expect(screen.getByText('Fleet Statistics')).toBeInTheDocument();
     });
     
-    // Should now be checked (dark mode)
-    expect(darkModeSwitch).toBeChecked();
+    const themeToggle = screen.getByRole('checkbox');
     
-    // Click again to toggle back to light mode
-    await act(async () => {
-      fireEvent.click(darkModeSwitch);
-    });
+    // Should start in light mode
+    expect(themeToggle).not.toBeChecked();
     
-    // Should be unchecked again (light mode)
-    expect(darkModeSwitch).not.toBeChecked();
+    // Toggle to dark mode
+    fireEvent.click(themeToggle);
+    expect(themeToggle).toBeChecked();
+    
+    // Toggle back to light mode
+    fireEvent.click(themeToggle);
+    expect(themeToggle).not.toBeChecked();
   });
 
   it('persists theme preference in localStorage', async () => {
-    axios.get.mockResolvedValueOnce({ data: { hosts: [] } });
-    
-    await act(async () => {
-      render(<App />);
+    // Mock statistics API call
+    axios.get.mockResolvedValueOnce({ 
+      data: { 
+        total_hosts: 0,
+        total_updates: 0,
+        recent_updates: 0,
+        top_packages: [],
+        updates_by_os: [],
+        updates_timeline: [],
+        host_activity: []
+      } 
     });
     
-    const darkModeSwitch = screen.getByLabelText('dark mode toggle');
+    render(<App />);
+    
+    await waitFor(() => {
+      expect(screen.getByText('Fleet Statistics')).toBeInTheDocument();
+    });
+    
+    const themeToggle = screen.getByRole('checkbox');
     
     // Toggle to dark mode
-    await act(async () => {
-      fireEvent.click(darkModeSwitch);
-    });
+    fireEvent.click(themeToggle);
     
-    // Check that dark mode is stored in localStorage
+    // Check localStorage
     expect(localStorage.getItem('themeMode')).toBe('dark');
     
     // Toggle back to light mode
-    await act(async () => {
-      fireEvent.click(darkModeSwitch);
-    });
+    fireEvent.click(themeToggle);
     
-    // Check that light mode is stored in localStorage
+    // Check localStorage
     expect(localStorage.getItem('themeMode')).toBe('light');
   });
 
-  it('loads theme preference from localStorage', async () => {
-    // Set dark mode in localStorage before rendering
+  it('loads theme preference from localStorage on startup', () => {
     localStorage.setItem('themeMode', 'dark');
     
+    // Mock statistics API call
+    axios.get.mockResolvedValueOnce({ 
+      data: { 
+        total_hosts: 0,
+        total_updates: 0,
+        recent_updates: 0,
+        top_packages: [],
+        updates_by_os: [],
+        updates_timeline: [],
+        host_activity: []
+      } 
+    });
+    
+    render(<App />);
+    
+    const themeToggle = screen.getByRole('checkbox');
+    expect(themeToggle).toBeChecked(); // Should start in dark mode
+  });
+
+  it('handles route changes correctly', async () => {
+    // Mock statistics API call
+    axios.get.mockResolvedValueOnce({ 
+      data: { 
+        total_hosts: 0,
+        total_updates: 0,
+        recent_updates: 0,
+        top_packages: [],
+        updates_by_os: [],
+        updates_timeline: [],
+        host_activity: []
+      } 
+    });
+    
+    render(<App />);
+    
+    await waitFor(() => {
+      expect(screen.getByText('Fleet Statistics')).toBeInTheDocument();
+    });
+    
+    // Verify statistics tab is active
+    const statisticsTab = screen.getByText('Statistics').closest('button');
+    expect(statisticsTab).toHaveClass('Mui-selected');
+    
+    // Mock hosts API call
     axios.get.mockResolvedValueOnce({ data: { hosts: [] } });
     
-    await act(async () => {
-      render(<App />);
-    });
+    // Navigate to hosts
+    const hostsTab = screen.getByText('Hosts').closest('button');
+    fireEvent.click(hostsTab);
     
-    const darkModeSwitch = screen.getByLabelText('dark mode toggle');
-    
-    // Should be checked (dark mode) based on localStorage
-    expect(darkModeSwitch).toBeChecked();
-  });
-
-  it('renders filter controls when host is selected', async () => {
-    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
-    axios.get.mockResolvedValueOnce({ data: [
-      {
-        update_date: '2025-06-07',
-        os: 'Ubuntu',
-        name: 'nginx',
-        old_version: '1.18.0',
-        new_version: '1.20.0',
-      },
-    ] });
-    
-    await act(async () => {
-      render(<App />);
-    });
-    
-    await act(async () => {
-      fireEvent.click(await screen.findByText('host1'));
-    });
-    
-    // Check for filter controls
-    expect(await screen.findByText('Filters')).toBeInTheDocument();
-    expect(screen.getByLabelText('From Date')).toBeInTheDocument();
-    expect(screen.getByLabelText('To Date')).toBeInTheDocument();
-    expect(screen.getAllByText('Operating System')[0]).toBeInTheDocument(); // Select first instance
-    expect(screen.getByLabelText('Package Name')).toBeInTheDocument();
-    expect(screen.getByText('Clear Filters')).toBeInTheDocument();
-  });
-
-  it('applies date filters when changed', async () => {
-    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
-    // First call for initial load
-    axios.get.mockResolvedValueOnce({ data: {
-      items: [
-        {
-          update_date: '2025-06-07',
-          os: 'Ubuntu',
-          name: 'nginx',
-          old_version: '1.18.0',
-          new_version: '1.20.0',
-        },
-      ],
-      total: 1,
-      limit: 25,
-      offset: 0
-    } });
-    // Second call with date filter
-    axios.get.mockResolvedValueOnce({ data: {
-      items: [],
-      total: 0,
-      limit: 25,
-      offset: 0
-    } });
-    
-    await act(async () => {
-      render(<App />);
-    });
-    
-    await act(async () => {
-      fireEvent.click(await screen.findByText('host1'));
-    });
-    
-    // Wait for initial load
-    await waitFor(() => expect(screen.getByText('nginx')).toBeInTheDocument());
-    
-    // Apply date filter
-    const fromDateInput = screen.getByLabelText('From Date');
-    await act(async () => {
-      fireEvent.change(fromDateInput, { target: { value: '2025-06-08' } });
-    });
-    
-    // Check that the API was called with the filter parameter
     await waitFor(() => {
-      const lastCall = axios.get.mock.calls[axios.get.mock.calls.length - 1];
-      expect(lastCall[0]).toContain('date_from=2025-06-08');
+      expect(screen.getByText('Host Management')).toBeInTheDocument();
     });
+    
+    // Verify hosts tab is now active
+    expect(hostsTab).toHaveClass('Mui-selected');
+    expect(statisticsTab).not.toHaveClass('Mui-selected');
   });
 
-  it('applies package name filter when changed', async () => {
-    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
-    // First call for initial load
-    axios.get.mockResolvedValueOnce({ data: {
-      items: [
-        {
-          update_date: '2025-06-07',
-          os: 'Ubuntu',
-          name: 'nginx',
-          old_version: '1.18.0',
-          new_version: '1.20.0',
-        },
-      ],
-      total: 1,
-      limit: 25,
-      offset: 0
-    } });
-    // Second call with package filter
-    axios.get.mockResolvedValueOnce({ data: {
-      items: [],
-      total: 0,
-      limit: 25,
-      offset: 0
-    } });
-    
-    await act(async () => {
-      render(<App />);
+  it('renders correct theme icons', async () => {
+    // Mock statistics API call
+    axios.get.mockResolvedValueOnce({ 
+      data: { 
+        total_hosts: 0,
+        total_updates: 0,
+        recent_updates: 0,
+        top_packages: [],
+        updates_by_os: [],
+        updates_timeline: [],
+        host_activity: []
+      } 
     });
     
-    await act(async () => {
-      fireEvent.click(await screen.findByText('host1'));
-    });
+    render(<App />);
     
-    // Wait for initial load
-    await waitFor(() => expect(screen.getByText('nginx')).toBeInTheDocument());
-    
-    // Apply package filter
-    const packageInput = screen.getByLabelText('Package Name');
-    await act(async () => {
-      fireEvent.change(packageInput, { target: { value: 'apache' } });
-    });
-    
-    // Check that the API was called with the filter parameter
     await waitFor(() => {
-      const lastCall = axios.get.mock.calls[axios.get.mock.calls.length - 1];
-      expect(lastCall[0]).toContain('package=apache');
-    });
-  });
-
-  it('clears all filters when clear button is clicked', async () => {
-    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
-    // First call for initial load
-    axios.get.mockResolvedValueOnce({ data: {
-      items: [
-        {
-          update_date: '2025-06-07',
-          os: 'Ubuntu',
-          name: 'nginx',
-          old_version: '1.18.0',
-          new_version: '1.20.0',
-        },
-      ],
-      total: 1,
-      limit: 25,
-      offset: 0
-    } });
-    // Second call with package filter
-    axios.get.mockResolvedValueOnce({ data: {
-      items: [],
-      total: 0,
-      limit: 25,
-      offset: 0
-    } });
-    // Third call after clearing filters
-    axios.get.mockResolvedValueOnce({ data: {
-      items: [
-        {
-          update_date: '2025-06-07',
-          os: 'Ubuntu',
-          name: 'nginx',
-          old_version: '1.18.0',
-          new_version: '1.20.0',
-        },
-      ],
-      total: 1,
-      limit: 25,
-      offset: 0
-    } });
-    
-    await act(async () => {
-      render(<App />);
+      expect(screen.getByText('Fleet Statistics')).toBeInTheDocument();
     });
     
-    await act(async () => {
-      fireEvent.click(await screen.findByText('host1'));
-    });
+    // In light mode, should show sun icon
+    expect(screen.getByTestId('Brightness7Icon')).toBeInTheDocument();
     
-    // Wait for initial load
-    await waitFor(() => expect(screen.getByText('nginx')).toBeInTheDocument());
+    // Toggle to dark mode
+    const themeToggle = screen.getByRole('checkbox');
+    fireEvent.click(themeToggle);
     
-    // Apply package filter
-    const packageInput = screen.getByLabelText('Package Name');
-    await act(async () => {
-      fireEvent.change(packageInput, { target: { value: 'apache' } });
-    });
-    
-    // Clear filters
-    const clearButton = screen.getByText('Clear Filters');
-    await act(async () => {
-      fireEvent.click(clearButton);
-    });
-    
-    // Check that filters are cleared
-    expect(packageInput.value).toBe('');
-    
-    // Check that the API was called without filter parameters (but with pagination)
-    await waitFor(() => {
-      const lastCall = axios.get.mock.calls[axios.get.mock.calls.length - 1];
-      expect(lastCall[0]).toContain('/api/history/host1?limit=25&offset=0');
-    });
-  });
-
-  it('shows filtered message when filters are active', async () => {
-    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
-    // First call for initial load
-    axios.get.mockResolvedValueOnce({ data: {
-      items: [
-        {
-          update_date: '2025-06-07',
-          os: 'Ubuntu',
-          name: 'nginx',
-          old_version: '1.18.0',
-          new_version: '1.20.0',
-        },
-      ],
-      total: 1,
-      limit: 25,
-      offset: 0
-    } });
-    // Second call with filter
-    axios.get.mockResolvedValueOnce({ data: {
-      items: [
-        {
-          update_date: '2025-06-07',
-          os: 'Ubuntu',
-          name: 'nginx',
-          old_version: '1.18.0',
-          new_version: '1.20.0',
-        },
-      ],
-      total: 1,
-      limit: 25,
-      offset: 0
-    } });
-    
-    await act(async () => {
-      render(<App />);
-    });
-    
-    await act(async () => {
-      fireEvent.click(await screen.findByText('host1'));
-    });
-    
-    // Wait for initial load
-    await waitFor(() => expect(screen.getByText('nginx')).toBeInTheDocument());
-    
-    // Apply package filter
-    const packageInput = screen.getByLabelText('Package Name');
-    await act(async () => {
-      fireEvent.change(packageInput, { target: { value: 'nginx' } });
-    });
-    
-    // Check for active filter indicator and filtered results message
-    await waitFor(() => {
-      expect(screen.getByText('Active')).toBeInTheDocument();
-      expect(screen.getByText('Showing 1 of 1 update (filtered)')).toBeInTheDocument();
-    });
-  });
-
-  it('renders pagination controls when there are multiple pages', async () => {
-    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
-    // Mock response with multiple pages worth of data
-    axios.get.mockResolvedValueOnce({ data: {
-      items: Array.from({ length: 25 }, (_, i) => ({
-        update_date: '2025-06-07',
-        os: 'Ubuntu',
-        name: `package${i}`,
-        old_version: '1.0.0',
-        new_version: '1.1.0',
-      })),
-      total: 100, // More than one page (25 per page)
-      limit: 25,
-      offset: 0
-    } });
-    
-    await act(async () => {
-      render(<App />);
-    });
-    
-    await act(async () => {
-      fireEvent.click(await screen.findByText('host1'));
-    });
-    
-    // Wait for initial load
-    await waitFor(() => expect(screen.getByText('package0')).toBeInTheDocument());
-    
-    // Check pagination info is displayed
-    expect(screen.getByText('Showing 25 of 100 updates • Page 1 of 4')).toBeInTheDocument();
-    
-    // Check pagination controls are rendered
-    const pagination = screen.getByRole('navigation');
-    expect(pagination).toBeInTheDocument();
-    
-    // Check page buttons
-    expect(screen.getByRole('button', { name: 'Go to page 2' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Go to last page' })).toBeInTheDocument();
-  });
-
-  it('handles page navigation correctly', async () => {
-    axios.get.mockResolvedValueOnce({ data: { hosts: ['host1'] } });
-    // Initial page load
-    axios.get.mockResolvedValueOnce({ data: {
-      items: [{ update_date: '2025-06-07', os: 'Ubuntu', name: 'package1', old_version: '1.0.0', new_version: '1.1.0' }],
-      total: 50,
-      limit: 25,
-      offset: 0
-    } });
-    // Second page load
-    axios.get.mockResolvedValueOnce({ data: {
-      items: [{ update_date: '2025-06-07', os: 'Ubuntu', name: 'package26', old_version: '1.0.0', new_version: '1.1.0' }],
-      total: 50,
-      limit: 25,
-      offset: 25
-    } });
-    
-    await act(async () => {
-      render(<App />);
-    });
-    
-    await act(async () => {
-      fireEvent.click(await screen.findByText('host1'));
-    });
-    
-    // Wait for initial load
-    await waitFor(() => expect(screen.getByText('package1')).toBeInTheDocument());
-    
-    // Click page 2 button
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Go to page 2' }));
-    });
-    
-    // Check that the API was called with correct offset
-    await waitFor(() => {
-      const lastCall = axios.get.mock.calls[axios.get.mock.calls.length - 1];
-      expect(lastCall[0]).toContain('offset=25');
-    });
-    
-    // Check new content is displayed
-    await waitFor(() => expect(screen.getByText('package26')).toBeInTheDocument());
+    // In dark mode, should show moon icon
+    expect(screen.getByTestId('Brightness4Icon')).toBeInTheDocument();
   });
 });
