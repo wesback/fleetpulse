@@ -275,7 +275,7 @@ const StatisticsPage = () => {
                 Active Percentage
               </Typography>
               <Typography variant="h4">
-                {statistics.total_hosts > 0 
+                {statistics.total_updates > 0 
                   ? Math.round((statistics.recent_updates / statistics.total_updates) * 100) 
                   : 0}%
               </Typography>

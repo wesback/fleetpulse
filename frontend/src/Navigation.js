@@ -23,7 +23,8 @@ const Navigation = ({ mode, toggleTheme }) => {
   const location = useLocation();
   const navigate = useNavigate();
   
-  const currentPath = location.pathname;
+  // Map root path to statistics path for tab selection
+  const currentPath = location.pathname === '/' ? '/statistics' : location.pathname;
   
   const handleTabChange = (event, newValue) => {
     navigate(newValue);
