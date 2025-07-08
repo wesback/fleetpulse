@@ -12,3 +12,10 @@ global.TextDecoder = TextDecoder;
 
 // Mock the chartjs-adapter-date-fns to prevent initialization issues in tests
 jest.mock('chartjs-adapter-date-fns', () => ({}));
+
+// Configure React Testing Library to handle React 18+ act warnings
+import { configure } from '@testing-library/react';
+
+configure({
+  asyncUtilTimeout: 1000,
+});

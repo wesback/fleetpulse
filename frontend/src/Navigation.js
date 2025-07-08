@@ -24,6 +24,8 @@ const Navigation = ({ mode, toggleTheme }) => {
   const navigate = useNavigate();
   
   const currentPath = location.pathname;
+  // Default to /statistics for MUI Tabs if path is root
+  const tabValue = currentPath === '/' ? '/statistics' : currentPath;
   
   const handleTabChange = (event, newValue) => {
     navigate(newValue);
@@ -39,7 +41,7 @@ const Navigation = ({ mode, toggleTheme }) => {
         
         <Box sx={{ mr: 2 }}>
           <Tabs 
-            value={currentPath} 
+            value={tabValue} 
             onChange={handleTabChange}
             textColor="inherit"
             indicatorColor="secondary"
