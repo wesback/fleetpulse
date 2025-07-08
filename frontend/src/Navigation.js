@@ -23,9 +23,8 @@ const Navigation = ({ mode, toggleTheme }) => {
   const location = useLocation();
   const navigate = useNavigate();
   
-  const currentPath = location.pathname;
-  // Default to /statistics for MUI Tabs if path is root
-  const tabValue = currentPath === '/' ? '/statistics' : currentPath;
+  // Map root path to statistics path for tab selection
+  const currentPath = location.pathname === '/' ? '/statistics' : location.pathname;
   
   const handleTabChange = (event, newValue) => {
     navigate(newValue);

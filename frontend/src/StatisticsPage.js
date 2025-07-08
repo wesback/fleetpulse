@@ -89,6 +89,10 @@ const StatisticsPage = () => {
     );
   }
 
+  if (!statistics) {
+    return null;
+  }
+
   // Chart color schemes based on theme
   const chartColors = {
     primary: theme.palette.primary.main,
@@ -224,6 +228,7 @@ const StatisticsPage = () => {
       </Typography>
       
       {/* Summary Cards */}
+
       <Box sx={{ mb: 4, display: 'flex', gap: 3, flexWrap: 'wrap' }}>
         <Card sx={{ flex: '1 1 calc(25% - 12px)', minWidth: '200px' }}>
           <CardContent>
@@ -281,6 +286,7 @@ const StatisticsPage = () => {
         <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
           {/* Updates Timeline */}
           <Paper elevation={2} sx={{ p: 2, height: 400, flex: '2 1 600px' }}>
+
             <Typography variant="h6" gutterBottom>
               Updates Timeline (Last 30 Days)
             </Typography>
@@ -289,8 +295,10 @@ const StatisticsPage = () => {
             </Box>
           </Paper>
 
+
           {/* OS Distribution */}
           <Paper elevation={2} sx={{ p: 2, height: 400, flex: '1 1 300px' }}>
+
             <Typography variant="h6" gutterBottom>
               Updates by Operating System
             </Typography>
@@ -300,10 +308,12 @@ const StatisticsPage = () => {
           </Paper>
         </Box>
 
+
         {/* Second Row */}
         <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
           {/* Top Packages */}
           <Paper elevation={2} sx={{ p: 2, height: 400, flex: '1 1 calc(50% - 12px)' }}>
+
             <Typography variant="h6" gutterBottom>
               Most Updated Packages
             </Typography>
@@ -312,8 +322,10 @@ const StatisticsPage = () => {
             </Box>
           </Paper>
 
+
           {/* Host Activity */}
           <Paper elevation={2} sx={{ p: 2, height: 400, flex: '1 1 calc(50% - 12px)' }}>
+
             <Typography variant="h6" gutterBottom>
               Most Active Hosts
             </Typography>
