@@ -9,3 +9,6 @@ import { TextEncoder, TextDecoder } from 'util';
 
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder;
+
+// Mock the chartjs-adapter-date-fns to prevent initialization issues in tests
+jest.mock('chartjs-adapter-date-fns', () => ({}));
