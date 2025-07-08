@@ -26,6 +26,9 @@ const Navigation = ({ mode, toggleTheme }) => {
   // Map root path to statistics path for tab selection
   const currentPath = location.pathname === '/' ? '/statistics' : location.pathname;
   
+  // Ensure the tab value is always one of the valid tab values
+  const tabValue = ['/statistics', '/hosts'].includes(currentPath) ? currentPath : '/statistics';
+  
   const handleTabChange = (event, newValue) => {
     navigate(newValue);
   };
