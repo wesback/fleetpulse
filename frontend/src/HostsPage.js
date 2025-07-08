@@ -60,6 +60,7 @@ const HostsPage = () => {
   const [availableOSes, setAvailableOSes] = useState([]);
 
   useEffect(() => {
+    isMountedRef.current = true;
     fetchHosts();
     
     return () => {
