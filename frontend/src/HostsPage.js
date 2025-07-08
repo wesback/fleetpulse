@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import axios from 'axios';
 import {
   Container,
@@ -39,6 +39,7 @@ const HostsPage = () => {
   const [selectedHost, setSelectedHost] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+  const isMountedRef = useRef(true);
   
   // Filter state
   const [filters, setFilters] = useState({
@@ -59,21 +60,30 @@ const HostsPage = () => {
   const [availableOSes, setAvailableOSes] = useState([]);
 
   useEffect(() => {
+    isMountedRef.current = true;
     fetchHosts();
+    
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
-  const fetchHosts = async () => {
+  const fetchHosts = useCallback(async () => {
     try {
       const response = await axios.get(`${API_BASE}/hosts`);
       const hostsData = Array.isArray(response.data.hosts) ? response.data.hosts : [];
-      setHosts(hostsData);
+      if (isMountedRef.current) {
+        setHosts(hostsData);
+      }
     } catch (err) {
       console.error('Error fetching hosts:', err);
-      setHosts([]); // Defensive: always set to array
+      if (isMountedRef.current) {
+        setHosts([]); // Defensive: always set to array
+      }
     }
-  };
+  }, []);
 
-  const fetchHistory = async (host, currentFilters = filters, currentPage = 1) => {
+  const fetchHistory = useCallback(async (host, currentFilters = filters, currentPage = 1) => {
     setLoading(true);
     setSelectedHost(host);
     
@@ -98,35 +108,41 @@ const HostsPage = () => {
       const response = await axios.get(url);
       const data = response.data;
       
-      setHistory(data.items || []);
-      setPagination(prev => ({
-        ...prev,
-        page: currentPage,
-        total: data.total || 0
-      }));
-      
-      // Extract unique OS values for dropdown from current page
-      const osSet = new Set((data.items || []).map(item => item.os));
-      const currentOSes = Array.from(osSet);
-      
-      // Merge with existing OS options to preserve them across filter operations
-      setAvailableOSes(prev => {
-        const combinedSet = new Set([...prev, ...currentOSes]);
-        return Array.from(combinedSet).sort();
-      });
+      if (isMountedRef.current) {
+        setHistory(data.items || []);
+        setPagination(prev => ({
+          ...prev,
+          page: currentPage,
+          total: data.total || 0
+        }));
+        
+        // Extract unique OS values for dropdown from current page
+        const osSet = new Set((data.items || []).map(item => item.os));
+        const currentOSes = Array.from(osSet);
+        
+        // Merge with existing OS options to preserve them across filter operations
+        setAvailableOSes(prev => {
+          const combinedSet = new Set([...prev, ...currentOSes]);
+          return Array.from(combinedSet).sort();
+        });
+      }
     } catch (err) {
       console.error('Error fetching history:', err);
-      setHistory([]);
-      // Don't clear availableOSes on filter errors to preserve dropdown options
-      setPagination(prev => ({
-        ...prev,
-        page: currentPage,
-        total: 0
-      }));
+      if (isMountedRef.current) {
+        setHistory([]);
+        // Don't clear availableOSes on filter errors to preserve dropdown options
+        setPagination(prev => ({
+          ...prev,
+          page: currentPage,
+          total: 0
+        }));
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [filters, pagination.pageSize]);
   
   const handleFilterChange = (filterName, value) => {
     const newFilters = { ...filters, [filterName]: value };

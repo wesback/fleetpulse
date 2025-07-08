@@ -40,7 +40,7 @@ const Navigation = ({ mode, toggleTheme }) => {
         
         <Box sx={{ mr: 2 }}>
           <Tabs 
-            value={currentPath} 
+            value={tabValue} 
             onChange={handleTabChange}
             textColor="inherit"
             indicatorColor="secondary"

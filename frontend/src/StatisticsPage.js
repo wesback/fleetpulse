@@ -228,70 +228,65 @@ const StatisticsPage = () => {
       </Typography>
       
       {/* Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Total Hosts
-              </Typography>
-              <Typography variant="h4">
-                {statistics.total_hosts}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Total Updates
-              </Typography>
-              <Typography variant="h4">
-                {statistics.total_updates.toLocaleString()}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Recent Updates
-              </Typography>
-              <Typography variant="h4">
-                {statistics.recent_updates.toLocaleString()}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                Last 30 days
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Active Percentage
-              </Typography>
-              <Typography variant="h4">
-                {statistics.total_updates > 0 
-                  ? Math.round((statistics.recent_updates / statistics.total_updates) * 100) 
-                  : 0}%
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                Recent activity
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+
+      <Box sx={{ mb: 4, display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+        <Card sx={{ flex: '1 1 calc(25% - 12px)', minWidth: '200px' }}>
+          <CardContent>
+            <Typography color="textSecondary" gutterBottom>
+              Total Hosts
+            </Typography>
+            <Typography variant="h4">
+              {statistics.total_hosts}
+            </Typography>
+          </CardContent>
+        </Card>
+        <Card sx={{ flex: '1 1 calc(25% - 12px)', minWidth: '200px' }}>
+          <CardContent>
+            <Typography color="textSecondary" gutterBottom>
+              Total Updates
+            </Typography>
+            <Typography variant="h4">
+              {statistics.total_updates.toLocaleString()}
+            </Typography>
+          </CardContent>
+        </Card>
+        <Card sx={{ flex: '1 1 calc(25% - 12px)', minWidth: '200px' }}>
+          <CardContent>
+            <Typography color="textSecondary" gutterBottom>
+              Recent Updates
+            </Typography>
+            <Typography variant="h4">
+              {statistics.recent_updates.toLocaleString()}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Last 30 days
+            </Typography>
+          </CardContent>
+        </Card>
+        <Card sx={{ flex: '1 1 calc(25% - 12px)', minWidth: '200px' }}>
+          <CardContent>
+            <Typography color="textSecondary" gutterBottom>
+              Active Percentage
+            </Typography>
+            <Typography variant="h4">
+              {statistics.total_hosts > 0 
+                ? Math.round((statistics.recent_updates / statistics.total_updates) * 100) 
+                : 0}%
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Recent activity
+            </Typography>
+          </CardContent>
+        </Card>
+      </Box>
 
       {/* Charts */}
-      <Grid container spacing={3}>
-        {/* Updates Timeline */}
-        <Grid size={{ xs: 12, lg: 8 }}>
-          <Paper elevation={2} sx={{ p: 2, height: 400 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {/* First Row */}
+        <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+          {/* Updates Timeline */}
+          <Paper elevation={2} sx={{ p: 2, height: 400, flex: '2 1 600px' }}>
+
             <Typography variant="h6" gutterBottom>
               Updates Timeline (Last 30 Days)
             </Typography>
@@ -299,11 +294,11 @@ const StatisticsPage = () => {
               <Line data={timelineData} options={timelineOptions} />
             </Box>
           </Paper>
-        </Grid>
 
-        {/* OS Distribution */}
-        <Grid size={{ xs: 12, lg: 4 }}>
-          <Paper elevation={2} sx={{ p: 2, height: 400 }}>
+
+          {/* OS Distribution */}
+          <Paper elevation={2} sx={{ p: 2, height: 400, flex: '1 1 300px' }}>
+
             <Typography variant="h6" gutterBottom>
               Updates by Operating System
             </Typography>
@@ -311,11 +306,14 @@ const StatisticsPage = () => {
               <Doughnut data={osDistributionData} options={doughnutOptions} />
             </Box>
           </Paper>
-        </Grid>
+        </Box>
 
-        {/* Top Packages */}
-        <Grid size={{ xs: 12, lg: 6 }}>
-          <Paper elevation={2} sx={{ p: 2, height: 400 }}>
+
+        {/* Second Row */}
+        <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+          {/* Top Packages */}
+          <Paper elevation={2} sx={{ p: 2, height: 400, flex: '1 1 calc(50% - 12px)' }}>
+
             <Typography variant="h6" gutterBottom>
               Most Updated Packages
             </Typography>
@@ -323,11 +321,11 @@ const StatisticsPage = () => {
               <Bar data={topPackagesData} options={chartOptions} />
             </Box>
           </Paper>
-        </Grid>
 
-        {/* Host Activity */}
-        <Grid size={{ xs: 12, lg: 6 }}>
-          <Paper elevation={2} sx={{ p: 2, height: 400 }}>
+
+          {/* Host Activity */}
+          <Paper elevation={2} sx={{ p: 2, height: 400, flex: '1 1 calc(50% - 12px)' }}>
+
             <Typography variant="h6" gutterBottom>
               Most Active Hosts
             </Typography>
@@ -335,8 +333,8 @@ const StatisticsPage = () => {
               <Bar data={hostActivityData} options={chartOptions} />
             </Box>
           </Paper>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
     </Container>
   );
 };
