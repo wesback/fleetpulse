@@ -128,17 +128,17 @@ def test_statistics_endpoint_with_data(client_with_db_override):
     
     # Verify basic counts
     assert stats["total_hosts"] == 4  # host1, host2, host3, host4
-    assert stats["total_updates"] == 11  # Total packages across all reports
-    assert stats["recent_updates"] == 10  # All except the old host3 update
+    assert stats["total_updates"] == 12  # Total packages across all reports
+    assert stats["recent_updates"] == 11  # All except the old host3 update
     
-    # Verify top packages (nginx should be most frequent with 3 updates)
+    # Verify top packages (nginx should be most frequent with 4 updates)
     top_packages = stats["top_packages"]
     assert len(top_packages) > 0
     
     # Find nginx in top packages
     nginx_stats = next((pkg for pkg in top_packages if pkg["name"] == "nginx"), None)
     assert nginx_stats is not None
-    assert nginx_stats["count"] == 3  # Updated on host1, host2, host4
+    assert nginx_stats["count"] == 4  # Updated on host1 (twice), host2, host4
     
     # Verify updates by OS
     updates_by_os = stats["updates_by_os"]
@@ -147,7 +147,7 @@ def test_statistics_endpoint_with_data(client_with_db_override):
     # Find Ubuntu stats (should have most updates)
     ubuntu_stats = next((os_stat for os_stat in updates_by_os if "Ubuntu" in os_stat["os"]), None)
     assert ubuntu_stats is not None
-    assert ubuntu_stats["count"] == 7  # 2 + 5 from host1 and host4
+    assert ubuntu_stats["count"] == 9  # 2 + 2 + 5 from host1 (twice) and host4
     
     # Verify timeline has recent dates
     timeline = stats["updates_timeline"]

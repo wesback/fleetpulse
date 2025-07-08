@@ -187,7 +187,6 @@ describe('HostsPage', () => {
     };
     
     axios.get.mockResolvedValueOnce({ data: initialHistoryData });
-    axios.get.mockResolvedValueOnce({ data: { items: [], total: 0, limit: 25, offset: 0 } });
     
     render(<HostsPage />);
     
@@ -206,10 +205,13 @@ describe('HostsPage', () => {
     fireEvent.mouseDown(osSelect);
     
     await waitFor(() => {
-      expect(screen.getByText('Ubuntu 22.04')).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Ubuntu 22.04' })).toBeInTheDocument();
     });
     
-    fireEvent.click(screen.getByText('Ubuntu 22.04'));
+    // Mock the response for the filtered request
+    axios.get.mockResolvedValueOnce({ data: { items: [], total: 0, limit: 25, offset: 0 } });
+    
+    fireEvent.click(screen.getByRole('option', { name: 'Ubuntu 22.04' }));
     
     await waitFor(() => {
       expect(axios.get).toHaveBeenCalledWith(

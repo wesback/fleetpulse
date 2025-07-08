@@ -255,8 +255,10 @@ const HostsPage = () => {
                     />
                     
                     <FormControl size="small" sx={{ minWidth: 200 }}>
-                      <InputLabel>Operating System</InputLabel>
+                      <InputLabel id="os-filter-label">Operating System</InputLabel>
                       <Select
+                        labelId="os-filter-label"
+                        id="os-filter"
                         value={filters.os}
                         label="Operating System"
                         onChange={(e) => handleFilterChange('os', e.target.value)}
