@@ -90,7 +90,9 @@ describe('HostsPage', () => {
     fireEvent.click(screen.getByText('test-host'));
     
     await waitFor(() => {
-      expect(screen.getByText('Update History for test-host')).toBeInTheDocument();
+      expect(screen.getByText((content, element) => {
+        return element && element.textContent === 'Update History for test-host';
+      })).toBeInTheDocument();
       expect(screen.getByText('nginx')).toBeInTheDocument();
       expect(screen.getByText('Ubuntu 22.04')).toBeInTheDocument();
       expect(screen.getByText('1.20.0')).toBeInTheDocument();
