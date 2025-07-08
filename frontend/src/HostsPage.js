@@ -107,11 +107,17 @@ const HostsPage = () => {
       
       // Extract unique OS values for dropdown from current page
       const osSet = new Set((data.items || []).map(item => item.os));
-      setAvailableOSes(Array.from(osSet).sort());
+      const currentOSes = Array.from(osSet);
+      
+      // Merge with existing OS options to preserve them across filter operations
+      setAvailableOSes(prev => {
+        const combinedSet = new Set([...prev, ...currentOSes]);
+        return Array.from(combinedSet).sort();
+      });
     } catch (err) {
       console.error('Error fetching history:', err);
       setHistory([]);
-      setAvailableOSes([]);
+      // Don't clear availableOSes on filter errors to preserve dropdown options
       setPagination(prev => ({
         ...prev,
         page: currentPage,
@@ -193,6 +199,7 @@ const HostsPage = () => {
                     package: ''
                   };
                   setFilters(emptyFilters);
+                  setAvailableOSes([]); // Clear OS options when switching hosts
                   setPagination(prev => ({ ...prev, page: 1 }));
                   fetchHistory(host, emptyFilters, 1);
                 }}
