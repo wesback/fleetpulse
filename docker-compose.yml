@@ -94,8 +94,8 @@ services:
       - "8001:8001"  # MCP Server API
     restart: unless-stopped
     environment:
-      # Backend connection
-      - FLEETPULSE_BACKEND_URL=http://backend:8000
+      # FleetPulse backend connection
+      - FLEETPULSE_API_URL=http://backend:8000
       
       # MCP server settings
       - MCP_PORT=8001

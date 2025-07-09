@@ -16,7 +16,7 @@ export class MCPRoutes {
 
   constructor() {
     this.router = express.Router();
-    this.queryInterpreter = new FleetPulseQueryInterpreter();
+    this.queryInterpreter = new FleetPulseQueryInterpreter(config.fleetpulse.apiUrl);
     this.setupRoutes();
   }
 

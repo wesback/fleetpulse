@@ -47,7 +47,7 @@ services:
     ports:
       - "8001:8001"  # MCP Server API
     environment:
-      # FleetPulse backend connection
+      # FleetPulse backend connection - REQUIRED
       - FLEETPULSE_API_URL=http://backend:8000
       
       # MCP server configuration
@@ -55,7 +55,20 @@ services:
       - MCP_HOST=0.0.0.0
       
       # Model endpoint for proxy functionality (optional)
-      - MODEL_ENDPOINT_URL=${MODEL_ENDPOINT_URL:-http://localhost:8000/api/v1/completions}
+      # This is used by the /mcp/v1/proxy endpoint to forward requests to LLM APIs
+      # 
+      # Using the included Ollama service (recommended for self-hosted):
+      - MODEL_ENDPOINT_URL=${MODEL_ENDPOINT_URL:-http://ollama:11434/api/chat}
+      #
+      # Alternative external services:
+      # - OpenAI API: https://api.openai.com/v1/chat/completions
+      # - Local Ollama on host: http://host.docker.internal:11434/api/chat
+      # - Local LM Studio: http://host.docker.internal:1234/v1/chat/completions
+      # - Azure OpenAI: https://your-resource.openai.azure.com/openai/deployments/your-model/chat/completions
+      
+      # API Keys for external model services (set in .env file)
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
       
       # Logging configuration
       - LOG_LEVEL=${LOG_LEVEL:-info}
@@ -71,6 +84,7 @@ services:
       - MAX_REQUEST_SIZE=${MAX_REQUEST_SIZE:-10mb}
     depends_on:
       - backend
+      - ollama  # Add dependency on Ollama service
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
@@ -80,6 +94,35 @@ services:
       start_period: 40s
     networks:
       - fleetpulse_network
+
+  # Optional: Add Ollama for local LLM inference (recommended for self-hosted deployments)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: fleetpulse-ollama
+    ports:
+      - "11434:11434"  # Ollama API
+    volumes:
+      - ollama_data:/root/.ollama  # Persistent model storage
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_ORIGINS=*
+    restart: unless-stopped
+    # Uncomment for GPU support (requires nvidia-docker)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    networks:
+      - fleetpulse_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   # Optional: Add a database service if your application requires one
   # database:
@@ -108,6 +151,8 @@ services:
 volumes:
   fleetpulse_data:
     driver: local
+  ollama_data:
+    driver: local
   # postgres_data:
   #   driver: local
   # redis_data:
@@ -121,10 +166,19 @@ networks:
 # Usage Instructions:
 # 1. Copy this file to your deployment server
 # 2. Rename it to docker-compose.yml or use: docker-compose -f docker-compose.sample.yml up
-# 3. Update environment variables and port mappings as needed
-# 4. Create a .env file for sensitive configuration values
+# 3. Create a .env file for sensitive configuration values like API keys:
+#    MODEL_ENDPOINT_URL=https://api.openai.com/v1/chat/completions
+#    OPENAI_API_KEY=sk-your-openai-api-key-here
+# 4. Update environment variables and port mappings as needed
 # 5. Run: docker-compose up -d
-# 6. Access the services:
+# 6. Download models for Ollama (after containers are running):
+#    # Lightweight development models:
+#    docker exec -it fleetpulse-ollama ollama pull phi3:mini        # 2.3GB - Recommended for dev
+#    docker exec -it fleetpulse-ollama ollama pull tinyllama:1.1b   # 0.6GB - Ultra fast
+#    # Production models:
+#    docker exec -it fleetpulse-ollama ollama pull llama3.1:8b      # 4.7GB - Full featured
+#    docker exec -it fleetpulse-ollama ollama pull mistral:7b       # 4.1GB - Good performance
+# 7. Access the services:
 #    - Frontend UI: http://localhost:8080
 #    - Backend API: http://localhost:8000
 #    - MCP Server: http://localhost:8001
@@ -133,10 +187,29 @@ networks:
 #      * Context Processing: POST http://localhost:8001/mcp/v1/context
 #      * FleetPulse Queries: POST http://localhost:8001/mcp/v1/query
 #      * Model Proxy: POST http://localhost:8001/mcp/v1/proxy
+#    - Ollama API: http://localhost:11434
+#      * Available models: GET http://localhost:11434/api/tags
+#      * Chat endpoint: POST http://localhost:11434/api/chat
 #
 # MCP Server Features:
-# - Natural language queries about FleetPulse data
+# - Natural language queries about FleetPulse data (via /query endpoint)
 # - Model Context Protocol implementation
 # - OpenAPI 3.1 specification
-# - Request proxying to model endpoints
+# - Request proxying to model endpoints (via /proxy endpoint)
 # - TypeScript-based with full type safety
+#
+# Model Proxy Functionality:
+# The /mcp/v1/proxy endpoint allows you to:
+# - Forward requests to external LLM APIs (OpenAI, Anthropic, etc.)
+# - Use the included Ollama service for local AI inference
+# - Transform requests/responses through the MCP server
+# - Add authentication headers and monitoring
+# - Centralize all AI model interactions
+# Set MODEL_ENDPOINT_URL to your preferred LLM API endpoint
+#
+# Ollama Usage:
+# - The included Ollama service provides local LLM inference
+# - No external API keys required for basic functionality
+# - Models are downloaded and cached in the ollama_data volume
+# - Supports GPU acceleration with proper Docker configuration
+# - For production, consider downloading models during build time

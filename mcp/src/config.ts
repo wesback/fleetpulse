@@ -14,6 +14,9 @@ export interface Config {
   model: {
     endpointUrl: string;
   };
+  fleetpulse: {
+    apiUrl: string;
+  };
   logging: {
     level: string;
     format: 'json' | 'simple';
@@ -52,6 +55,9 @@ export const config: Config = {
   model: {
     endpointUrl: process.env.MODEL_ENDPOINT_URL || 'http://localhost:8000/api/v1/completions',
   },
+  fleetpulse: {
+    apiUrl: process.env.FLEETPULSE_API_URL || 'http://localhost:8000',
+  },
   logging: {
     level: process.env.LOG_LEVEL || 'info',
     format: (process.env.LOG_FORMAT as 'json' | 'simple') || 'json',
@@ -79,10 +85,20 @@ export function validateConfig(): void {
     errors.push('MODEL_ENDPOINT_URL is required');
   }
 
+  if (!config.fleetpulse.apiUrl) {
+    errors.push('FLEETPULSE_API_URL is required');
+  }
+
   try {
     new URL(config.model.endpointUrl);
   } catch {
     errors.push('MODEL_ENDPOINT_URL must be a valid URL');
+  }
+
+  try {
+    new URL(config.fleetpulse.apiUrl);
+  } catch {
+    errors.push('FLEETPULSE_API_URL must be a valid URL');
   }
 
   if (!['debug', 'info', 'warn', 'error'].includes(config.logging.level)) {

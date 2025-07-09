@@ -1,4 +1,3 @@
-import { config } from '../config';
 import { logger } from '../logger';
 
 /**
@@ -43,13 +42,8 @@ export class FleetPulseAPIClient {
   private baseUrl: string;
 
   constructor(baseUrl?: string) {
-    this.baseUrl = baseUrl || config.model.endpointUrl.replace('/api/v1/completions', '');
-    
-    // Try to detect if we have a FleetPulse backend URL
-    if (this.baseUrl.includes('completions')) {
-      // Default to localhost if the model endpoint is for completions
-      this.baseUrl = 'http://localhost:8000';
-    }
+    // Use provided URL or fall back to default localhost
+    this.baseUrl = baseUrl || 'http://localhost:8000';
   }
 
   /**
