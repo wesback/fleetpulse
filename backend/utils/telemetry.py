@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 # Try to import telemetry functions with graceful fallback
 try:
-    from backend.telemetry import (
+    from telemetry import (
         create_custom_span,
         record_package_update_metrics,
         record_host_metrics,

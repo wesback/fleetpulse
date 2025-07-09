@@ -2,7 +2,7 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional
 from datetime import date
-from backend.utils.constants import (
+from utils.constants import (
     MAX_HOSTNAME_LENGTH,
     MAX_PACKAGE_NAME_LENGTH,
     MAX_VERSION_LENGTH,

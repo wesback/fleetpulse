@@ -1,6 +1,6 @@
 """Validation utilities for input data."""
 import re
-from backend.utils.constants import (
+from utils.constants import (
     MAX_HOSTNAME_LENGTH,
     MAX_PACKAGE_NAME_LENGTH,
     MAX_VERSION_LENGTH,
