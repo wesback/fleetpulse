@@ -33,6 +33,11 @@ export class FleetPulseQueryInterpreter {
         return await this.handleHealthQuery();
       }
 
+      // Package update queries (high priority to catch specific timeframe questions)
+      if (this.isPackageUpdateQuery(normalizedQuery)) {
+        return await this.handlePackageUpdateQuery(normalizedQuery);
+      }
+
       // Statistics and overview queries
       if (this.isStatisticsQuery(normalizedQuery)) {
         return await this.handleStatisticsQuery(normalizedQuery);
@@ -81,13 +86,26 @@ export class FleetPulseQueryInterpreter {
   }
 
   private isStatisticsQuery(query: string): boolean {
-    const statsKeywords = ['statistics', 'stats', 'overview', 'summary', 'dashboard', 'total', 'count', 'how many'];
-    return statsKeywords.some(keyword => query.includes(keyword));
+    // Don't classify as statistics if it's specifically about packages/updates with timeframes
+    if (this.isPackageUpdateQuery(query)) {
+      return false;
+    }
+    
+    const statsKeywords = ['statistics', 'stats', 'overview', 'summary', 'dashboard'];
+    const generalCountKeywords = ['total', 'count', 'how many'];
+    
+    // Only match general count queries if they don't have specific context
+    const hasGeneralCount = generalCountKeywords.some(keyword => query.includes(keyword));
+    const hasSpecificContext = query.includes('package') || query.includes('update') || query.includes('upgrade') || 
+                              query.includes('host') || query.includes('day') || query.includes('week') || query.includes('month');
+    
+    return statsKeywords.some(keyword => query.includes(keyword)) || 
+           (hasGeneralCount && !hasSpecificContext);
   }
 
   private isHostQuery(query: string): boolean {
     const hostKeywords = ['host', 'hosts', 'server', 'servers', 'machine', 'machines', 'computer'];
-    return hostKeywords.some(keyword => query.includes(keyword));
+    return hostKeywords.some(keyword => query.includes(keyword)) && !this.isPackageUpdateQuery(query);
   }
 
   private isPackageQuery(query: string): boolean {
@@ -98,6 +116,18 @@ export class FleetPulseQueryInterpreter {
   private isHistoryQuery(query: string): boolean {
     const historyKeywords = ['history', 'updates', 'recent', 'latest', 'timeline', 'when', 'what happened'];
     return historyKeywords.some(keyword => query.includes(keyword));
+  }
+
+  private isPackageUpdateQuery(query: string): boolean {
+    const packageKeywords = ['package', 'packages'];
+    const updateKeywords = ['update', 'updates', 'upgrade', 'upgraded', 'install', 'installed'];
+    const timeKeywords = ['day', 'days', 'week', 'weeks', 'month', 'months', 'last', 'recent', 'today', 'yesterday'];
+    
+    const hasPackage = packageKeywords.some(keyword => query.includes(keyword));
+    const hasUpdate = updateKeywords.some(keyword => query.includes(keyword));
+    const hasTime = timeKeywords.some(keyword => query.includes(keyword));
+    
+    return (hasPackage && hasUpdate) || (hasUpdate && hasTime);
   }
 
   private async handleHealthQuery(): Promise<QueryResult> {
@@ -277,6 +307,129 @@ export class FleetPulseQueryInterpreter {
         'Check top updated packages'
       ]
     };
+  }
+
+  private async handlePackageUpdateQuery(query: string): Promise<QueryResult> {
+    // Extract timeframe from query
+    const timeframe = this.extractTimeframe(query);
+    
+    try {
+      if (timeframe.days <= 1) {
+        // For "last day" or "today" queries, we need to get recent updates
+        // Get updates from all hosts and filter by date
+        const hosts = await this.apiClient.getHosts();
+        let totalUpdates = 0;
+        const updatesByHost: Record<string, number> = {};
+        
+        for (const host of hosts.slice(0, 10)) { // Limit to first 10 hosts for performance
+          try {
+            const history = await this.apiClient.getHostHistory(host, { limit: 50 });
+            const recentUpdates = history.items.filter(update => {
+              const updateDate = new Date(update.update_date);
+              const cutoffDate = new Date();
+              cutoffDate.setDate(cutoffDate.getDate() - timeframe.days);
+              return updateDate >= cutoffDate;
+            });
+            updatesByHost[host] = recentUpdates.length;
+            totalUpdates += recentUpdates.length;
+          } catch (error) {
+            logger.warn(`Failed to get history for host ${host}`, { error });
+          }
+        }
+        
+        const topHosts = Object.entries(updatesByHost)
+          .filter(([, count]) => count > 0)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 5);
+        
+        return {
+          success: true,
+          data: { 
+            total_updates: totalUpdates, 
+            timeframe: timeframe.description,
+            updates_by_host: updatesByHost,
+            top_hosts: topHosts
+          },
+          message: totalUpdates > 0 
+            ? `Found ${totalUpdates} package updates in ${timeframe.description}. Top active hosts: ${topHosts.map(([host, count]) => `${host} (${count})`).join(', ')}`
+            : `No package updates found in ${timeframe.description}.`,
+          context_type: 'package_updates_timeframe',
+          suggestions: [
+            'Check updates for specific hosts',
+            'View top updated packages',
+            'Get updates for longer timeframe'
+          ]
+        };
+      } else {
+        // For longer timeframes, use the statistics data
+        const stats = await this.apiClient.getStatistics();
+        
+        return {
+          success: true,
+          data: { 
+            recent_updates: stats.recent_updates, 
+            timeframe: timeframe.description,
+            total_updates: stats.total_updates,
+            top_packages: stats.top_packages.slice(0, 5)
+          },
+          message: `FleetPulse has recorded ${stats.recent_updates} package updates in ${timeframe.description}. Most updated packages: ${stats.top_packages.slice(0, 3).map(p => `${p.name} (${p.count})`).join(', ')}`,
+          context_type: 'package_updates_period',
+          suggestions: [
+            'Get updates by host',
+            'View specific package details',
+            'Check updates by operating system'
+          ]
+        };
+      }
+    } catch (error) {
+      logger.error('Failed to get package update data', { query, error });
+      return {
+        success: false,
+        message: `Sorry, I couldn't retrieve package update information: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        context_type: 'error',
+        suggestions: [
+          'Try asking about general statistics',
+          'Check specific host updates',
+          'View system health status'
+        ]
+      };
+    }
+  }
+
+  private extractTimeframe(query: string): { days: number; description: string } {
+    // Handle specific timeframe keywords
+    if (query.includes('today')) {
+      return { days: 0, description: 'today' };
+    }
+    if (query.includes('yesterday')) {
+      return { days: 1, description: 'yesterday' };
+    }
+    if (query.includes('last day') || query.includes('past day')) {
+      return { days: 1, description: 'the last day' };
+    }
+    if (query.includes('last week') || query.includes('past week')) {
+      return { days: 7, description: 'the last week' };
+    }
+    if (query.includes('last month') || query.includes('past month')) {
+      return { days: 30, description: 'the last month' };
+    }
+    
+    // Look for number patterns
+    const dayMatch = query.match(/(\d+)\s*days?/);
+    if (dayMatch) {
+      const days = parseInt(dayMatch[1]);
+      return { days, description: `the last ${days} day${days > 1 ? 's' : ''}` };
+    }
+    
+    const weekMatch = query.match(/(\d+)\s*weeks?/);
+    if (weekMatch) {
+      const weeks = parseInt(weekMatch[1]);
+      const days = weeks * 7;
+      return { days, description: `the last ${weeks} week${weeks > 1 ? 's' : ''}` };
+    }
+    
+    // Default to last 30 days for general "recent" queries
+    return { days: 30, description: 'the last 30 days' };
   }
 
   private handleGeneralQuery(): QueryResult {
