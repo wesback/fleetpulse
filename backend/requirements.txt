@@ -1,0 +1,27 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0 # For running the FastAPI app
+gunicorn==22.0.0 # Production WSGI server with uvicorn workers
+sqlmodel==0.0.24
+pytest==8.3.4 # For running tests
+pytest-asyncio==0.23.6 # For async test support
+httpx==0.28.1 # For TestClient
+
+# OpenTelemetry core packages - aligned versions
+opentelemetry-api==1.28.2
+opentelemetry-sdk==1.28.2
+opentelemetry-semantic-conventions==0.49b2
+
+# OpenTelemetry auto-instrumentation - aligned versions
+opentelemetry-instrumentation==0.49b2
+opentelemetry-instrumentation-fastapi==0.49b2
+opentelemetry-instrumentation-sqlalchemy==0.49b2
+opentelemetry-instrumentation-httpx==0.49b2
+opentelemetry-instrumentation-requests==0.49b2
+
+# OpenTelemetry exporters - aligned versions
+opentelemetry-exporter-otlp==1.28.2
+opentelemetry-exporter-jaeger==1.21.0
+
+# OpenTelemetry propagators - aligned versions
+opentelemetry-propagator-b3==1.28.2
+opentelemetry-propagator-jaeger==1.28.2

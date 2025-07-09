@@ -1,0 +1,129 @@
+---
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    container_name: fleetpulse-backend
+    volumes:
+      - ${FLEETPULSE_DATA_PATH:-./data}:/data
+    ports:
+      - "8000:8000"  # Backend API
+    restart: unless-stopped
+    environment:
+      - FLEETPULSE_DATA_DIR=/data
+      - DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-uvicorn}
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
+      # OpenTelemetry configuration
+      - OTEL_SERVICE_NAME=fleetpulse-backend
+      - OTEL_SERVICE_VERSION=1.0.0
+      - OTEL_ENVIRONMENT=${OTEL_ENVIRONMENT:-development}
+      - OTEL_ENABLE_TELEMETRY=${OTEL_ENABLE_TELEMETRY:-true}
+      - OTEL_EXPORTER_TYPE=${OTEL_EXPORTER_TYPE:-jaeger}
+      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+      - OTEL_TRACE_SAMPLE_RATE=${OTEL_TRACE_SAMPLE_RATE:-1.0}
+      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_AGENT_PORT=6831
+    networks:
+      - fleetpulse
+    depends_on:
+      - jaeger
+      - otel-collector
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: fleetpulse-frontend
+    ports:
+      - "8080:80"  # Frontend UI
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - fleetpulse
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: fleetpulse-jaeger
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # Accept jaeger.thrift over HTTP
+      - "6831:6831/udp"  # Accept jaeger.thrift over UDP (agents)
+      - "6832:6832/udp"  # Accept jaeger.thrift over UDP (agents, compact)
+      - "5778:5778"     # Serve configs (sampling strategies, etc.)
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+    restart: unless-stopped
+    networks:
+      - fleetpulse
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: fleetpulse-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8888:8888"   # Prometheus metrics
+      - "8889:8889"   # Prometheus exporter metrics
+    depends_on:
+      - jaeger
+    restart: unless-stopped
+    networks:
+      - fleetpulse
+
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    container_name: fleetpulse-mcp
+    volumes:
+      - ${FLEETPULSE_DATA_PATH:-./data}:/data:ro  # Read-only access to data
+    ports:
+      - "8001:8001"  # MCP Server API
+    restart: unless-stopped
+    environment:
+      # Backend connection
+      - FLEETPULSE_BACKEND_URL=http://backend:8000
+      
+      # MCP server settings
+      - MCP_PORT=8001
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-30.0}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      
+      # OpenTelemetry configuration
+      - OTEL_SERVICE_NAME=fleetpulse-mcp
+      - OTEL_SERVICE_VERSION=1.0.0
+      - OTEL_ENVIRONMENT=${OTEL_ENVIRONMENT:-development}
+      - OTEL_ENABLE_TELEMETRY=${OTEL_ENABLE_TELEMETRY:-true}
+      - OTEL_EXPORTER_TYPE=${OTEL_EXPORTER_TYPE:-jaeger}
+      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+      - OTEL_TRACE_SAMPLE_RATE=${OTEL_TRACE_SAMPLE_RATE:-1.0}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - fleetpulse
+    depends_on:
+      - backend
+      - jaeger
+      - otel-collector
+
+networks:
+  fleetpulse:
+    driver: bridge
