@@ -40,6 +40,9 @@ logger = logging.getLogger(__name__)
 tracer = None
 meter = None
 
+# Global metrics instances - created once during initialization
+_metrics_cache = None
+
 
 def setup_resource() -> Resource:
     """Create and configure the OpenTelemetry resource."""
@@ -125,7 +128,7 @@ def setup_metrics():
 
 def initialize_telemetry():
     """Initialize OpenTelemetry with all instrumentation."""
-    global tracer, meter
+    global tracer, meter, _metrics_cache
     
     config = get_config()
     
@@ -142,6 +145,9 @@ def initialize_telemetry():
         tracer = trace.get_tracer(__name__)
         meter = metrics.get_meter(__name__)
         
+        # Create metrics once during initialization
+        _metrics_cache = create_metrics()
+        
         # Auto-instrument HTTP clients
         HTTPXClientInstrumentor().instrument()
         
@@ -152,6 +158,7 @@ def initialize_telemetry():
         # Continue without telemetry
         tracer = None
         meter = None
+        _metrics_cache = None
 
 
 def instrument_fastapi_app(app):
@@ -163,10 +170,17 @@ def instrument_fastapi_app(app):
 
 def shutdown_telemetry():
     """Shutdown OpenTelemetry components."""
+    global tracer, meter, _metrics_cache
+    
     logger.info("Shutting down OpenTelemetry...")
     
+    # Reset global variables to prevent reuse of old instances
+    tracer = None
+    meter = None
+    _metrics_cache = None
+    
     # OpenTelemetry 1.28.2: TracerProvider and MeterProvider do not require explicit shutdown.
-    # Telemetry is flushed automatically on process exit. No action required here.
+    # Telemetry is flushed automatically on process exit.
 
 
 @contextmanager
@@ -189,8 +203,11 @@ def create_custom_span(name: str, attributes: Optional[dict] = None):
         yield span
 
 
+def get_metrics():
+    """Get the cached metrics instances."""
+    return _metrics_cache or {}
 def create_metrics():
-    """Create custom metrics for the MCP server."""
+    """Create custom metrics for the MCP server. Called once during initialization."""
     if meter is None:
         return {}
     
@@ -233,7 +250,7 @@ def record_mcp_request_metrics(endpoint: str, status_code: int, duration_seconds
         return
     
     try:
-        metrics_dict = create_metrics()
+        metrics_dict = get_metrics()
         
         # Record request count
         if "mcp_requests_total" in metrics_dict:
@@ -259,7 +276,7 @@ def record_backend_api_metrics(endpoint: str, status_code: int, duration_seconds
         return
     
     try:
-        metrics_dict = create_metrics()
+        metrics_dict = get_metrics()
         
         # Record request count
         if "backend_api_requests_total" in metrics_dict:
