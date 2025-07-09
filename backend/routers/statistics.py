@@ -3,10 +3,10 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select, func
 from datetime import datetime, timedelta
-from backend.models.schemas import StatisticsResponse
-from backend.models.database import PackageUpdate
-from backend.db.session import get_session
-from backend.utils.telemetry import create_business_span
+from models.schemas import StatisticsResponse
+from models.database import PackageUpdate
+from db.session import get_session
+from utils.telemetry import create_business_span
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

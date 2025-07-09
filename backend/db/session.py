@@ -3,7 +3,7 @@
 import logging
 from sqlmodel import Session
 from fastapi import HTTPException, status
-from backend.db.engine import get_engine
+from db.engine import get_engine
 
 # Configure logging
 logger = logging.getLogger(__name__)
