@@ -7,7 +7,10 @@ import shutil
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, create_engine
-from backend.main import app, get_session, get_engine, SQLModel as AppSQLModel
+from backend.main import app
+from backend.db.session import get_session
+from backend.db.engine import get_engine
+from sqlmodel import SQLModel as AppSQLModel
 from datetime import date, timedelta
 
 @pytest.fixture(scope="session")

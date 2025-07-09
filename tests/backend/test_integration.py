@@ -48,9 +48,9 @@ def test_database_initialization_environment_variables():
             'FORCE_DB_RECREATE': 'false'
         }, clear=False):
             # Reset the global variables to use our test path
-            with patch('backend.main.engine', None), \
-                 patch('backend.main.DATA_DIR', temp_dir), \
-                 patch('backend.main.DB_PATH', os.path.join(temp_dir, 'updates.db')):
+            with patch('backend.db.engine.engine', None), \
+                 patch('backend.utils.constants.DATA_DIR', temp_dir), \
+                 patch('backend.utils.constants.DB_PATH', os.path.join(temp_dir, 'updates.db')):
                 
                 from backend.main import lifespan
                 from fastapi import FastAPI
@@ -76,9 +76,9 @@ def test_database_initialization_environment_variables():
             'FORCE_DB_RECREATE': 'true'
         }, clear=False):
             # Reset the global variables to use our test path
-            with patch('backend.main.engine', None), \
-                 patch('backend.main.DATA_DIR', temp_dir), \
-                 patch('backend.main.DB_PATH', os.path.join(temp_dir, 'updates.db')):
+            with patch('backend.db.engine.engine', None), \
+                 patch('backend.utils.constants.DATA_DIR', temp_dir), \
+                 patch('backend.utils.constants.DB_PATH', os.path.join(temp_dir, 'updates.db')):
                 
                 async def test_force_recreate():
                     app = FastAPI()

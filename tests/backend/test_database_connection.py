@@ -3,7 +3,7 @@ import shutil
 import pytest
 import os
 from sqlalchemy import text
-from backend.main import get_engine
+from backend.db.engine import get_engine
 
 
 def test_database_engine_creation():
@@ -17,14 +17,15 @@ def test_database_engine_creation():
         os.environ["FLEETPULSE_DATA_DIR"] = temp_dir
         
         # Reset the global engine and update the paths to force re-creation
-        import backend.main
-        original_engine = backend.main.engine
-        original_data_dir_module = backend.main.DATA_DIR
-        original_db_path_module = backend.main.DB_PATH
+        import backend.db.engine
+        import backend.utils.constants
+        original_engine = backend.db.engine.engine
+        original_data_dir_module = backend.utils.constants.DATA_DIR
+        original_db_path_module = backend.utils.constants.DB_PATH
         
-        backend.main.engine = None
-        backend.main.DATA_DIR = temp_dir
-        backend.main.DB_PATH = os.path.join(temp_dir, "updates.db")
+        backend.db.engine.engine = None
+        backend.utils.constants.DATA_DIR = temp_dir
+        backend.utils.constants.DB_PATH = os.path.join(temp_dir, "updates.db")
         
         # This should work without throwing SQLAlchemy compatibility errors
         engine = get_engine()
@@ -42,9 +43,9 @@ def test_database_engine_creation():
             os.environ["FLEETPULSE_DATA_DIR"] = original_data_dir
         else:
             os.environ.pop("FLEETPULSE_DATA_DIR", None)
-        backend.main.engine = original_engine
-        backend.main.DATA_DIR = original_data_dir_module
-        backend.main.DB_PATH = original_db_path_module
+        backend.db.engine.engine = original_engine
+        backend.utils.constants.DATA_DIR = original_data_dir_module
+        backend.utils.constants.DB_PATH = original_db_path_module
         
         # Clean up
         shutil.rmtree(temp_dir)

@@ -6,7 +6,10 @@ import asyncio
 from unittest.mock import patch, MagicMock
 from sqlalchemy import create_engine, inspect, text
 from sqlmodel import SQLModel
-from backend.main import lifespan, PackageUpdate, get_engine, DATA_DIR, DB_PATH
+from backend.main import lifespan
+from backend.models.database import PackageUpdate
+from backend.db.engine import get_engine
+from backend.utils.constants import DATA_DIR, DB_PATH
 from fastapi import FastAPI
 
 
@@ -18,9 +21,9 @@ async def test_database_initialization_new_database():
     try:
         # Mock the environment variables and paths
         with patch.dict(os.environ, {"FLEETPULSE_DATA_DIR": temp_dir}):
-            with patch('backend.main.DATA_DIR', temp_dir):
-                with patch('backend.main.DB_PATH', os.path.join(temp_dir, "test.db")):
-                    with patch('backend.main.engine', None):
+            with patch('backend.utils.constants.DATA_DIR', temp_dir):
+                with patch('backend.utils.constants.DB_PATH', os.path.join(temp_dir, "test.db")):
+                    with patch('backend.db.engine.engine', None):
                         # Create a test app
                         app = FastAPI()
                         
@@ -53,9 +56,9 @@ async def test_database_initialization_existing_database():
         
         # Now test that the lifespan doesn't recreate tables
         with patch.dict(os.environ, {"FLEETPULSE_DATA_DIR": temp_dir}):
-            with patch('backend.main.DATA_DIR', temp_dir):
-                with patch('backend.main.DB_PATH', db_path):
-                    with patch('backend.main.engine', None):
+            with patch('backend.utils.constants.DATA_DIR', temp_dir):
+                with patch('backend.utils.constants.DB_PATH', db_path):
+                    with patch('backend.db.engine.engine', None):
                         app = FastAPI()
                         
                         with patch('backend.main.logger') as mock_logger:
@@ -84,9 +87,9 @@ async def test_database_initialization_force_recreate():
             "FLEETPULSE_DATA_DIR": temp_dir,
             "FORCE_DB_RECREATE": "true"
         }):
-            with patch('backend.main.DATA_DIR', temp_dir):
-                with patch('backend.main.DB_PATH', db_path):
-                    with patch('backend.main.engine', None):
+            with patch('backend.utils.constants.DATA_DIR', temp_dir):
+                with patch('backend.utils.constants.DB_PATH', db_path):
+                    with patch('backend.db.engine.engine', None):
                         app = FastAPI()
                         
                         with patch('backend.main.logger') as mock_logger:
@@ -118,9 +121,9 @@ async def test_database_initialization_missing_tables():
             conn.commit()
         
         with patch.dict(os.environ, {"FLEETPULSE_DATA_DIR": temp_dir}):
-            with patch('backend.main.DATA_DIR', temp_dir):
-                with patch('backend.main.DB_PATH', db_path):
-                    with patch('backend.main.engine', None):
+            with patch('backend.utils.constants.DATA_DIR', temp_dir):
+                with patch('backend.utils.constants.DB_PATH', db_path):
+                    with patch('backend.db.engine.engine', None):
                         app = FastAPI()
                         
                         with patch('backend.main.logger') as mock_logger:
