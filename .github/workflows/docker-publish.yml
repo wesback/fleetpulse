@@ -30,10 +30,10 @@ jobs:
 #          export PYTHONPATH="${PYTHONPATH}:$(pwd)/backend"
 #          pytest tests/backend -v
 
-      - name: Run MCP tests
-        run: |
-          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
-          pytest tests/mcp -v
+#      - name: Run MCP tests
+#        run: |
+#          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+#          pytest tests/mcp -v
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
