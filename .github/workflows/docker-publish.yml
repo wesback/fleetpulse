@@ -36,6 +36,21 @@ jobs:
           cd frontend
           npm test -- --watchAll=false --passWithNoTests
 
+      - name: Install MCP server dependencies
+        run: |
+          cd mcp
+          npm ci
+
+      - name: Run MCP server tests
+        run: |
+          cd mcp
+          npm test
+
+      - name: Build MCP server
+        run: |
+          cd mcp
+          npm run build
+
   build-and-push:
     needs: test
     runs-on: ubuntu-latest
@@ -67,3 +82,11 @@ jobs:
           file: Dockerfile.frontend
           push: true
           tags: wesback/fleetpulse-frontend:latest
+
+      - name: Build and push MCP server image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.mcp
+          push: true
+          tags: wesback/fleetpulse-mcp:latest

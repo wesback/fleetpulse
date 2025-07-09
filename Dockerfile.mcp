@@ -1,28 +1,37 @@
 # FleetPulse MCP Server Dockerfile
 
-FROM python:3.12-slim
+FROM node:24-alpine
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Install system dependencies (if needed)
+RUN apk add --no-cache curl
 
-# Copy MCP server requirements and install Python dependencies
-COPY mcp/requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy package files first for better Docker layer caching
+COPY mcp/package*.json ./
 
-# Copy MCP server source code
-COPY mcp/ /app/mcp/
+# Install dependencies
+RUN npm ci --only=production
 
-# Set Python path to include the app directory
-ENV PYTHONPATH=/app
+# Copy TypeScript configuration and build the application
+COPY mcp/tsconfig.json ./
+COPY mcp/src ./src
+
+# Build the TypeScript application
+RUN npm install typescript && npm run build
+
+# Copy environment configuration
+COPY mcp/.env.example ./.env
 
 # Create non-root user
-RUN useradd --create-home --shell /bin/bash mcp && \
-    chown -R mcp:mcp /app
+RUN addgroup -g 1001 -S mcp && \
+    adduser -S mcp -u 1001
+
+# Change ownership of app directory
+RUN chown -R mcp:mcp /app
+
+# Switch to non-root user
 USER mcp
 
 # Expose MCP server port
@@ -33,11 +42,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8001/health || exit 1
 
 # Set default configuration
-ENV FLEETPULSE_BACKEND_URL=http://localhost:8000
+ENV NODE_ENV=production
 ENV MCP_PORT=8001
-ENV OTEL_ENABLE_TELEMETRY=true
-ENV OTEL_EXPORTER_TYPE=console
-ENV OTEL_SERVICE_NAME=fleetpulse-mcp
 
-# Run the MCP server
-CMD ["python", "-m", "uvicorn", "mcp.main:app", "--host", "0.0.0.0", "--port", "8001"]
+# Start the MCP server
+CMD ["node", "dist/server.js"]
