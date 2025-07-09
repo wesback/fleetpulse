@@ -12,7 +12,9 @@ instance/
 # SQLite database (if stored locally)
 *.sqlite3
 *.db
+# Database directories but not backend source code
 db/
+!backend/db/
 data/
 .mypy_cache/
 .pytest_cache/
