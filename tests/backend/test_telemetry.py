@@ -12,7 +12,9 @@ import shutil
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from sqlmodel import Session, create_engine
-from backend.main import app, get_engine, get_session
+from backend.main import app
+from backend.db.engine import get_engine
+from backend.db.session import get_session
 
 
 @pytest.fixture(scope="function")
@@ -27,7 +29,7 @@ def temp_db_file():
 def override_engine(temp_db_file):
     engine = create_engine(f"sqlite:///{temp_db_file}", connect_args={"check_same_thread": False})
     # Create tables for tests
-    from backend.main import SQLModel
+    from sqlmodel import SQLModel
     SQLModel.metadata.create_all(engine)
     return engine
 

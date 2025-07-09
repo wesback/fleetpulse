@@ -1,15 +1,14 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Query, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from sqlmodel import SQLModel, Field, Session, create_engine, select
-from sqlalchemy import text, func
-from typing import List, Optional, Dict, Any
-from datetime import date
+"""FastAPI backend application with modular structure."""
 import os
 import logging
-from contextlib import asynccontextmanager
-import re
 import time
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi import HTTPException, status
+from sqlmodel import SQLModel
+from sqlalchemy import inspect
 
 # Import telemetry after standard imports  
 try:
@@ -43,161 +42,17 @@ except ImportError:
     def add_baggage(*args, **kwargs): pass
     def get_tracer(*args, **kwargs): None
 
+# Import our modular components
+from backend.db.engine import get_engine
+from backend.utils.constants import DATA_DIR, DB_PATH
+from backend.routers import reports, hosts, statistics, health
+# Import models to ensure they're registered with SQLModel metadata
+from backend.models import database
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Constants
-MAX_HOSTNAME_LENGTH = 255
-MAX_PACKAGE_NAME_LENGTH = 255
-MAX_VERSION_LENGTH = 100
-MAX_OS_LENGTH = 50
-
-# Determine data directory based on environment variable
-DATA_DIR = os.environ.get("FLEETPULSE_DATA_DIR", "/data")
-DB_PATH = os.path.join(DATA_DIR, "updates.db")
-
-# Global engine variable
-engine = None
-
-def validate_hostname(hostname: str) -> bool:
-    """Validate hostname format and length."""
-    if not hostname or len(hostname) > MAX_HOSTNAME_LENGTH:
-        return False
-    # Basic hostname validation (alphanumeric, dots, hyphens)
-    pattern = r'^[a-zA-Z0-9.-]+$'
-    return bool(re.match(pattern, hostname))
-
-def validate_package_name(name: str) -> bool:
-    """Validate package name format and length."""
-    if not name or len(name) > MAX_PACKAGE_NAME_LENGTH:
-        return False
-    # Allow alphanumeric, dots, hyphens, underscores, plus signs, colons
-    pattern = r'^[a-zA-Z0-9._+-:]+$'
-    return bool(re.match(pattern, name))
-
-def validate_version(version: str) -> bool:
-    """Validate version string format and length."""
-    if not version or len(version) > MAX_VERSION_LENGTH:
-        return False
-    # Allow common version patterns
-    pattern = r'^[a-zA-Z0-9._+-:~]+$'
-    return bool(re.match(pattern, version))
-
-def validate_os(os_name: str) -> bool:
-    """Validate OS name format and length."""
-    if not os_name or len(os_name) > MAX_OS_LENGTH:
-        return False
-    # Allow alphanumeric, spaces, dots, hyphens
-    pattern = r'^[a-zA-Z0-9. -]+$'
-    return bool(re.match(pattern, os_name))
-
-def get_engine():
-    """Get database engine with proper error handling."""
-    global engine
-    if engine is None:
-        try:
-            logger.info(f"Creating database engine for: {DB_PATH}")
-            
-            # Ensure the directory exists
-            db_dir = os.path.dirname(DB_PATH)
-            if not os.path.exists(db_dir):
-                logger.info(f"Creating database directory: {db_dir}")
-                os.makedirs(db_dir, exist_ok=True)
-            
-            # Check if we can write to the database directory
-            if not os.access(db_dir, os.W_OK):
-                raise PermissionError(f"Cannot write to database directory: {db_dir}")
-            
-            engine = create_engine(
-                f"sqlite:///{DB_PATH}",
-                connect_args={"check_same_thread": False},
-                echo=False  # Set to True for SQL debugging
-            )
-            
-            # Test the connection
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-            
-            logger.info(f"Database engine created successfully: {DB_PATH}")
-            
-        except Exception as e:
-            logger.error(f"Failed to create database engine: {e}")
-            logger.error(f"Database path: {DB_PATH}")
-            logger.error(f"Database directory: {os.path.dirname(DB_PATH)}")
-            logger.error(f"Directory exists: {os.path.exists(os.path.dirname(DB_PATH))}")
-            if os.path.exists(os.path.dirname(DB_PATH)):
-                logger.error(f"Directory writable: {os.access(os.path.dirname(DB_PATH), os.W_OK)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database connection failed"
-            )
-    return engine
-
-def get_session():
-    """Get database session with proper cleanup."""
-    try:
-        with Session(get_engine()) as session:
-            yield session
-    except Exception as e:
-        logger.error(f"Database session error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database session failed"
-        )
-
-class PackageUpdate(SQLModel, table=True):
-    """Database model for package updates."""
-    __tablename__ = "package_updates"
-    
-    id: Optional[int] = Field(default=None, primary_key=True)
-    hostname: str = Field(max_length=MAX_HOSTNAME_LENGTH, index=True)
-    os: str = Field(max_length=MAX_OS_LENGTH)
-    update_date: date = Field(index=True)
-    name: str = Field(max_length=MAX_PACKAGE_NAME_LENGTH, index=True)
-    old_version: str = Field(max_length=MAX_VERSION_LENGTH)
-    new_version: str = Field(max_length=MAX_VERSION_LENGTH)
-
-class PackageInfo(SQLModel):
-    """Model for individual package update information."""
-    name: str = Field(max_length=MAX_PACKAGE_NAME_LENGTH)
-    old_version: str = Field(max_length=MAX_VERSION_LENGTH)
-    new_version: str = Field(max_length=MAX_VERSION_LENGTH)
-
-class UpdateIn(SQLModel):
-    """Input model for package update reports."""
-    hostname: str = Field(max_length=MAX_HOSTNAME_LENGTH)
-    os: str = Field(max_length=MAX_OS_LENGTH)
-    update_date: date
-    updated_packages: List[PackageInfo]
-
-class HostInfo(SQLModel):
-    """Model for host information."""
-    hostname: str
-    os: str
-    last_update: date
-
-class ErrorResponse(SQLModel):
-    """Standard error response model."""
-    error: str
-    detail: Optional[str] = None
-
-class PaginatedResponse(SQLModel):
-    """Response model for paginated data."""
-    items: List[PackageUpdate]
-    total: int
-    limit: int
-    offset: int
-
-class StatisticsResponse(SQLModel):
-    """Response model for statistics data."""
-    total_hosts: int
-    total_updates: int
-    recent_updates: int  # updates in last 30 days
-    top_packages: List[Dict[str, Any]]
-    updates_by_os: List[Dict[str, Any]]
-    updates_timeline: List[Dict[str, Any]]
-    host_activity: List[Dict[str, Any]]
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -246,7 +101,6 @@ async def lifespan(app: FastAPI):
             
             if db_exists:
                 # Check if our main table exists
-                from sqlalchemy import inspect
                 inspector = inspect(engine)
                 existing_tables = inspector.get_table_names()
                 
@@ -270,6 +124,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Application shutting down")
     shutdown_telemetry()
+
 
 # Initialize FastAPI app with lifespan
 app = FastAPI(
@@ -320,6 +175,7 @@ async def telemetry_middleware(request: Request, call_next):
     
     return response
 
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
     """Global HTTP exception handler."""
@@ -327,6 +183,7 @@ async def http_exception_handler(request, exc):
         status_code=exc.status_code,
         content={"error": exc.detail}
     )
+
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request, exc):
@@ -337,408 +194,13 @@ async def general_exception_handler(request, exc):
         content={"error": "Internal server error"}
     )
 
-@app.post("/report", status_code=status.HTTP_201_CREATED)
-def report_update(update: UpdateIn, session: Session = Depends(get_session)):
-    """Report package updates for a host."""
-    
-    # Create custom span for business logic
-    with create_custom_span("report_package_updates", {
-        "hostname": update.hostname,
-        "os": update.os,
-        "package_count": len(update.updated_packages),
-        "update_date": str(update.update_date),
-    }) as span:
-        try:
-            # Validate input data
-            if not validate_hostname(update.hostname):
-                span.set_attribute("validation.error", "invalid_hostname")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid hostname format"
-                )
-            
-            if not validate_os(update.os):
-                span.set_attribute("validation.error", "invalid_os")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid OS format"
-                )
-            
-            if not update.updated_packages:
-                span.set_attribute("validation.error", "no_packages")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="No packages provided"
-                )
-            
-            if len(update.updated_packages) > 1000:  # Reasonable limit
-                span.set_attribute("validation.error", "too_many_packages")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Too many packages in single request"
-                )
-            
-            # Validate each package
-            for pkg in update.updated_packages:
-                if not validate_package_name(pkg.name):
-                    span.set_attribute("validation.error", f"invalid_package_name_{pkg.name}")
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Invalid package name: {pkg.name}"
-                    )
-                
-                if not validate_version(pkg.old_version):
-                    span.set_attribute("validation.error", f"invalid_old_version_{pkg.old_version}")
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Invalid old version: {pkg.old_version}"
-                )
-            
-                if not validate_version(pkg.new_version):
-                    span.set_attribute("validation.error", f"invalid_new_version_{pkg.new_version}")
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Invalid new version: {pkg.new_version}"
-                    )
-            
-            span.set_attribute("validation.passed", True)
-            
-            # Insert package updates using SQLModel (prevents SQL injection)
-            updates_added = 0
-            for pkg in update.updated_packages:
-                package_update = PackageUpdate(
-                    hostname=update.hostname,
-                    os=update.os,
-                    update_date=update.update_date,
-                    name=pkg.name,
-                    old_version=pkg.old_version,
-                    new_version=pkg.new_version
-                )
-                session.add(package_update)
-                updates_added += 1
-            
-            session.commit()
-            
-            # Record business metrics
-            record_package_update_metrics(update.hostname, updates_added)
-            record_host_metrics(update.hostname, "add")
-            
-            span.set_attribute("updates.added", updates_added)
-            span.set_attribute("operation.success", True)
-            
-            logger.info(f"Added {updates_added} package updates for host {update.hostname}")
-            
-            return {
-                "status": "success",
-                "message": f"Recorded {updates_added} package updates",
-                "hostname": update.hostname
-            }
-            
-        except HTTPException:
-            session.rollback()
-            span.set_attribute("operation.success", False)
-            raise
-        except Exception as e:
-            session.rollback()
-            span.set_attribute("operation.success", False)
-            span.set_attribute("error.message", str(e))
-            logger.error(f"Error reporting update: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to record package updates"
-            )
 
-@app.get("/hosts", response_model=Dict[str, List[str]])
-def list_hosts(session: Session = Depends(get_session)):
-    """Get list of all hosts that have reported updates."""
-    try:
-        result = session.exec(select(PackageUpdate.hostname).distinct()).all()
-        return {"hosts": result}
-    except Exception as e:
-        logger.error(f"Error listing hosts: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve hosts"
-        )
+# Include routers
+app.include_router(reports.router, tags=["reports"])
+app.include_router(hosts.router, tags=["hosts"])
+app.include_router(statistics.router, tags=["statistics"])
+app.include_router(health.router, tags=["health"])
 
-@app.get("/history/{hostname}", response_model=PaginatedResponse)
-def host_history(
-    hostname: str, 
-    session: Session = Depends(get_session),
-    date_from: Optional[date] = Query(None, description="Filter updates from this date (inclusive)"),
-    date_to: Optional[date] = Query(None, description="Filter updates to this date (inclusive)"),
-    os: Optional[str] = Query(None, description="Filter by operating system"),
-    package: Optional[str] = Query(None, description="Filter by package name (partial match)"),
-    limit: int = Query(50, ge=1, le=1000, description="Number of items per page"),
-    offset: int = Query(0, ge=0, description="Number of items to skip")
-):
-    """Get update history for a specific host with optional filters."""
-    try:
-        if not validate_hostname(hostname):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid hostname format"
-            )
-        
-        # Validate filter parameters
-        if os and not validate_os(os):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid OS format"
-            )
-        
-        if package and not validate_package_name(package):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid package name format"
-            )
-        
-        if date_from and date_to and date_from > date_to:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="date_from cannot be after date_to"
-            )
-        
-        # Build base query with filters
-        base_query = select(PackageUpdate).where(PackageUpdate.hostname == hostname)
-        
-        if date_from:
-            base_query = base_query.where(PackageUpdate.update_date >= date_from)
-        
-        if date_to:
-            base_query = base_query.where(PackageUpdate.update_date <= date_to)
-        
-        if os:
-            base_query = base_query.where(PackageUpdate.os == os)
-        
-        if package:
-            # Use SQL LIKE for partial matching (case-insensitive)
-            base_query = base_query.where(PackageUpdate.name.ilike(f"%{package}%"))
-        
-        # Get total count of items matching filters
-        count_query = select(func.count()).select_from(
-            base_query.subquery()
-        )
-        total = session.exec(count_query).one()
-        
-        # Apply ordering and pagination to the main query
-        paginated_query = (
-            base_query
-            .order_by(PackageUpdate.update_date.desc(), PackageUpdate.id.desc())
-            .offset(offset)
-            .limit(limit)
-        )
-        
-        result = session.exec(paginated_query).all()
-        
-        if total == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No update history found for host: {hostname}"
-            )
-        
-        return PaginatedResponse(
-            items=result,
-            total=total,
-            limit=limit,
-            offset=offset
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting host history: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve host history"
-        )
-
-@app.get("/last-updates", response_model=List[HostInfo])
-def last_updates(session: Session = Depends(get_session)):
-    """Get the last update date for each host."""
-    try:
-        hosts = session.exec(select(PackageUpdate.hostname).distinct()).all()
-        data = []
-        
-        for host in hosts:
-            update = session.exec(
-                select(PackageUpdate)
-                .where(PackageUpdate.hostname == host)
-                .order_by(PackageUpdate.update_date.desc(), PackageUpdate.id.desc())
-            ).first()
-            
-            if update:
-                data.append(HostInfo(
-                    hostname=host,
-                    os=update.os,
-                    last_update=update.update_date
-                ))
-        
-        return data
-        
-    except Exception as e:
-        logger.error(f"Error getting last updates: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve last updates"
-        )
-
-@app.get("/statistics", response_model=StatisticsResponse)
-def get_statistics(session: Session = Depends(get_session)):
-    """Get comprehensive statistics for the dashboard."""
-    try:
-        with create_custom_span("get_statistics") as span:
-            # Total hosts
-            total_hosts = session.exec(
-                select(func.count(func.distinct(PackageUpdate.hostname)))
-            ).one()
-            
-            # Total updates
-            total_updates = session.exec(
-                select(func.count(PackageUpdate.id))
-            ).one()
-            
-            # Recent updates (last 30 days)
-            from datetime import datetime, timedelta
-            thirty_days_ago = datetime.now().date() - timedelta(days=30)
-            recent_updates = session.exec(
-                select(func.count(PackageUpdate.id))
-                .where(PackageUpdate.update_date >= thirty_days_ago)
-            ).one()
-            
-            # Top packages by update frequency
-            top_packages_query = session.exec(
-                select(
-                    PackageUpdate.name,
-                    func.count(PackageUpdate.id).label("count")
-                )
-                .group_by(PackageUpdate.name)
-                .order_by(func.count(PackageUpdate.id).desc())
-                .limit(10)
-            )
-            top_packages = [
-                {"name": row.name, "count": row.count} 
-                for row in top_packages_query
-            ]
-            
-            # Updates by OS
-            updates_by_os_query = session.exec(
-                select(
-                    PackageUpdate.os,
-                    func.count(PackageUpdate.id).label("count")
-                )
-                .group_by(PackageUpdate.os)
-                .order_by(func.count(PackageUpdate.id).desc())
-            )
-            updates_by_os = [
-                {"os": row.os, "count": row.count} 
-                for row in updates_by_os_query
-            ]
-            
-            # Updates timeline (last 30 days)
-            timeline_query = session.exec(
-                select(
-                    PackageUpdate.update_date,
-                    func.count(PackageUpdate.id).label("count")
-                )
-                .where(PackageUpdate.update_date >= thirty_days_ago)
-                .group_by(PackageUpdate.update_date)
-                .order_by(PackageUpdate.update_date.asc())
-            )
-            updates_timeline = [
-                {"date": row.update_date.isoformat(), "count": row.count} 
-                for row in timeline_query
-            ]
-            
-            # Host activity (updates per host)
-            host_activity_query = session.exec(
-                select(
-                    PackageUpdate.hostname,
-                    func.count(PackageUpdate.id).label("count"),
-                    func.max(PackageUpdate.update_date).label("last_update")
-                )
-                .group_by(PackageUpdate.hostname)
-                .order_by(func.count(PackageUpdate.id).desc())
-                .limit(10)
-            )
-            host_activity = [
-                {
-                    "hostname": row.hostname, 
-                    "count": row.count,
-                    "last_update": row.last_update.isoformat()
-                } 
-                for row in host_activity_query
-            ]
-            
-            span.set_attribute("statistics.total_hosts", total_hosts)
-            span.set_attribute("statistics.total_updates", total_updates)
-            span.set_attribute("statistics.recent_updates", recent_updates)
-            
-            return StatisticsResponse(
-                total_hosts=total_hosts,
-                total_updates=total_updates,
-                recent_updates=recent_updates,
-                top_packages=top_packages,
-                updates_by_os=updates_by_os,
-                updates_timeline=updates_timeline,
-                host_activity=host_activity
-            )
-            
-    except Exception as e:
-        logger.error(f"Error getting statistics: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve statistics"
-        )
-
-@app.get("/health")
-def health_check(session: Session = Depends(get_session)):
-    """Health check endpoint with telemetry information."""
-    with create_custom_span("health_check") as span:
-        try:
-            # Test database connection
-            session.exec(select(1)).first()
-            
-            # Get telemetry configuration
-            if TELEMETRY_ENABLED:
-                from telemetry import get_telemetry_config
-                telemetry_config = get_telemetry_config()
-                health_data = {
-                    "status": "healthy", 
-                    "database": "connected",
-                    "telemetry": {
-                        "enabled": telemetry_config["enable_telemetry"],
-                        "service_name": telemetry_config["service_name"],
-                        "service_version": telemetry_config["service_version"],
-                        "environment": telemetry_config["environment"],
-                        "exporter_type": telemetry_config["exporter_type"],
-                    }
-                }
-                span.set_attribute("telemetry.enabled", telemetry_config["enable_telemetry"])
-            else:
-                health_data = {
-                    "status": "healthy", 
-                    "database": "connected",
-                    "telemetry": {
-                        "enabled": False,
-                        "note": "OpenTelemetry dependencies not installed"
-                    }
-                }
-                span.set_attribute("telemetry.enabled", False)
-            
-            span.set_attribute("health.status", "healthy")
-            span.set_attribute("database.status", "connected")
-            
-            return health_data
-            
-        except Exception as e:
-            span.set_attribute("health.status", "unhealthy")
-            span.set_attribute("error.message", str(e))
-            logger.error(f"Health check failed: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Service unhealthy"
-            )
 
 if __name__ == "__main__":
     import uvicorn
