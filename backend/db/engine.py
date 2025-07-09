@@ -1,0 +1,56 @@
+"""Database engine management for FleetPulse."""
+
+import os
+import logging
+from sqlalchemy import create_engine, text
+from fastapi import HTTPException, status
+from backend.utils.constants import DB_PATH
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Global engine variable
+engine = None
+
+
+def get_engine():
+    """Get database engine with proper error handling."""
+    global engine
+    if engine is None:
+        try:
+            logger.info(f"Creating database engine for: {DB_PATH}")
+            
+            # Ensure the directory exists
+            db_dir = os.path.dirname(DB_PATH)
+            if not os.path.exists(db_dir):
+                logger.info(f"Creating database directory: {db_dir}")
+                os.makedirs(db_dir, exist_ok=True)
+            
+            # Check if we can write to the database directory
+            if not os.access(db_dir, os.W_OK):
+                raise PermissionError(f"Cannot write to database directory: {db_dir}")
+            
+            engine = create_engine(
+                f"sqlite:///{DB_PATH}",
+                connect_args={"check_same_thread": False},
+                echo=False  # Set to True for SQL debugging
+            )
+            
+            # Test the connection
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            
+            logger.info(f"Database engine created successfully: {DB_PATH}")
+            
+        except Exception as e:
+            logger.error(f"Failed to create database engine: {e}")
+            logger.error(f"Database path: {DB_PATH}")
+            logger.error(f"Database directory: {os.path.dirname(DB_PATH)}")
+            logger.error(f"Directory exists: {os.path.exists(os.path.dirname(DB_PATH))}")
+            if os.path.exists(os.path.dirname(DB_PATH)):
+                logger.error(f"Directory writable: {os.access(os.path.dirname(DB_PATH), os.W_OK)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database connection failed"
+            )
+    return engine
