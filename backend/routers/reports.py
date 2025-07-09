@@ -2,16 +2,16 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
-from models.schemas import UpdateIn
-from models.database import PackageUpdate
-from db.session import get_session
-from utils.validation import (
+from backend.models.schemas import UpdateIn
+from backend.models.database import PackageUpdate
+from backend.db.session import get_session
+from backend.utils.validation import (
     validate_hostname,
     validate_os,
     validate_package_name,
     validate_version
 )
-from utils.telemetry import (
+from backend.utils.telemetry import (
     create_business_span,
     record_package_update_metrics,
     record_host_metrics,

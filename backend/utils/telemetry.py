@@ -58,6 +58,18 @@ except ImportError as e:
         return None
 
 
+# Provide a global tracer stub for patching in tests
+class DummyTracer:
+    def start_as_current_span(self, name, *args, **kwargs):
+        class DummySpan:
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+            def set_attribute(self, k, v): pass
+        return DummySpan()
+
+tracer = DummyTracer()
+
+
 def is_telemetry_enabled() -> bool:
     """Check if telemetry is enabled and available."""
     return TELEMETRY_ENABLED

@@ -2,8 +2,8 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
-from db.session import get_session
-from utils.telemetry import create_business_span, is_telemetry_enabled
+from backend.db.session import get_session
+from backend.utils.telemetry import create_business_span, is_telemetry_enabled
 
 # Try to import telemetry configuration function directly for health check
 try:

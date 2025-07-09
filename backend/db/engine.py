@@ -4,7 +4,7 @@ import os
 import logging
 from sqlalchemy import create_engine, text
 from fastapi import HTTPException, status
-from utils import constants
+from backend.utils import constants
 
 # Configure logging
 logger = logging.getLogger(__name__)

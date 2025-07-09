@@ -43,11 +43,11 @@ except ImportError:
     def get_tracer(*args, **kwargs): return None
 
 # Import our modular components
-from db.engine import get_engine
-from utils import constants
-from routers import reports, hosts, statistics, health
+from backend.db.engine import get_engine
+from backend.utils import constants
+from backend.routers import reports, hosts, statistics, health
 # Import models to ensure they're registered with SQLModel metadata
-from models import database
+from backend.models import database
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

@@ -4,11 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlmodel import Session, select, func
 from typing import List, Dict, Optional
 from datetime import date
-from models.schemas import HostInfo, PaginatedResponse
-from models.database import PackageUpdate
-from db.session import get_session
-from utils.validation import validate_hostname, validate_os, validate_package_name
-from utils.telemetry import create_business_span, record_host_query_metrics
+from backend.models.schemas import HostInfo, PaginatedResponse
+from backend.models.database import PackageUpdate
+from backend.db.session import get_session
+from backend.utils.validation import validate_hostname, validate_os, validate_package_name
+from backend.utils.telemetry import create_business_span, record_host_query_metrics
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

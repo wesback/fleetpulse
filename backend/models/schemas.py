@@ -2,13 +2,13 @@
 from sqlmodel import SQLModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import date
-from utils.constants import (
+from backend.utils.constants import (
     MAX_HOSTNAME_LENGTH,
     MAX_PACKAGE_NAME_LENGTH,
     MAX_VERSION_LENGTH,
     MAX_OS_LENGTH
 )
-from models.database import PackageUpdate
+from backend.models.database import PackageUpdate
 
 
 class PackageInfo(SQLModel):

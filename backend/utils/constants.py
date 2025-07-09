@@ -8,5 +8,5 @@ MAX_VERSION_LENGTH = 100
 MAX_OS_LENGTH = 50
 
 # Database configuration
-DATA_DIR = os.environ.get("FLEETPULSE_DATA_DIR", "/data")
+DATA_DIR = os.environ.get("FLEETPULSE_DATA_DIR", "./data")
 DB_PATH = os.path.join(DATA_DIR, "updates.db")
