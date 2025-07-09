@@ -10,18 +10,14 @@ from fastapi import HTTPException, status
 from sqlmodel import SQLModel
 from sqlalchemy import inspect
 
-# Import telemetry after standard imports  
+# Import telemetry functions with graceful fallback
 try:
     from telemetry import (
         initialize_telemetry, 
         shutdown_telemetry,
         instrument_fastapi_app,
-        create_custom_span,
         record_request_metrics,
-        record_package_update_metrics,
-        record_host_metrics,
         add_baggage,
-        get_tracer,
     )
     TELEMETRY_ENABLED = True
 except ImportError:
@@ -30,17 +26,8 @@ except ImportError:
     def initialize_telemetry(): pass
     def shutdown_telemetry(): pass
     def instrument_fastapi_app(app): pass
-    def create_custom_span(name, attributes=None):
-        class DummySpan:
-            def __enter__(self): return self
-            def __exit__(self, *args): pass
-            def set_attribute(self, key, value): pass
-        return DummySpan()
     def record_request_metrics(*args, **kwargs): pass
-    def record_package_update_metrics(*args, **kwargs): pass
-    def record_host_metrics(*args, **kwargs): pass
     def add_baggage(*args, **kwargs): pass
-    def get_tracer(*args, **kwargs): None
 
 # Import our modular components
 from backend.db.engine import get_engine

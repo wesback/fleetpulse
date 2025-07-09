@@ -11,26 +11,11 @@ from backend.utils.validation import (
     validate_package_name,
     validate_version
 )
-
-# Import telemetry after standard imports  
-try:
-    from backend.telemetry import (
-        create_custom_span,
-        record_package_update_metrics,
-        record_host_metrics,
-    )
-    TELEMETRY_ENABLED = True
-except ImportError:
-    # Telemetry dependencies not available - create stubs
-    TELEMETRY_ENABLED = False
-    def create_custom_span(name, attributes=None):
-        class DummySpan:
-            def __enter__(self): return self
-            def __exit__(self, *args): pass
-            def set_attribute(self, key, value): pass
-        return DummySpan()
-    def record_package_update_metrics(*args, **kwargs): pass
-    def record_host_metrics(*args, **kwargs): pass
+from backend.utils.telemetry import (
+    create_business_span,
+    record_package_update_metrics,
+    record_host_metrics,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -41,12 +26,11 @@ def report_update(update: UpdateIn, session: Session = Depends(get_session)):
     """Report package updates for a host."""
     
     # Create custom span for business logic
-    with create_custom_span("report_package_updates", {
-        "hostname": update.hostname,
-        "os": update.os,
-        "package_count": len(update.updated_packages),
-        "update_date": str(update.update_date),
-    }) as span:
+    with create_business_span("report_package_updates", 
+                             hostname=update.hostname,
+                             os=update.os,
+                             package_count=len(update.updated_packages),
+                             update_date=str(update.update_date)) as span:
         try:
             # Validate input data
             if not validate_hostname(update.hostname):

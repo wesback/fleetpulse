@@ -6,20 +6,7 @@ from datetime import datetime, timedelta
 from backend.models.schemas import StatisticsResponse
 from backend.models.database import PackageUpdate
 from backend.db.session import get_session
-
-# Import telemetry after standard imports  
-try:
-    from backend.telemetry import create_custom_span
-    TELEMETRY_ENABLED = True
-except ImportError:
-    # Telemetry dependencies not available - create stub
-    TELEMETRY_ENABLED = False
-    def create_custom_span(name, attributes=None):
-        class DummySpan:
-            def __enter__(self): return self
-            def __exit__(self, *args): pass
-            def set_attribute(self, key, value): pass
-        return DummySpan()
+from backend.utils.telemetry import create_business_span
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -28,8 +15,8 @@ router = APIRouter()
 @router.get("/statistics", response_model=StatisticsResponse)
 def get_statistics(session: Session = Depends(get_session)):
     """Get comprehensive statistics for the dashboard."""
-    try:
-        with create_custom_span("get_statistics") as span:
+    with create_business_span("get_statistics") as span:
+        try:
             # Total hosts
             total_hosts = session.exec(
                 select(func.count(func.distinct(PackageUpdate.hostname)))
@@ -114,6 +101,9 @@ def get_statistics(session: Session = Depends(get_session)):
             span.set_attribute("statistics.total_hosts", total_hosts)
             span.set_attribute("statistics.total_updates", total_updates)
             span.set_attribute("statistics.recent_updates", recent_updates)
+            span.set_attribute("operation.success", True)
+            
+            logger.info(f"Retrieved statistics: {total_hosts} hosts, {total_updates} total updates")
             
             return StatisticsResponse(
                 total_hosts=total_hosts,
@@ -125,9 +115,11 @@ def get_statistics(session: Session = Depends(get_session)):
                 host_activity=host_activity
             )
             
-    except Exception as e:
-        logger.error(f"Error getting statistics: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve statistics"
-        )
+        except Exception as e:
+            span.set_attribute("operation.success", False)
+            span.set_attribute("error.message", str(e))
+            logger.error(f"Error getting statistics: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve statistics"
+            )
