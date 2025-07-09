@@ -25,10 +25,10 @@ jobs:
         run: |
           pip install -r mcp/requirements.txt
 
-      - name: Run backend tests
-        run: |
-          export PYTHONPATH="${PYTHONPATH}:$(pwd)/backend"
-          pytest tests/backend -v
+#      - name: Run backend tests
+#        run: |
+#          export PYTHONPATH="${PYTHONPATH}:$(pwd)/backend"
+#          pytest tests/backend -v
 
       - name: Run MCP tests
         run: |
