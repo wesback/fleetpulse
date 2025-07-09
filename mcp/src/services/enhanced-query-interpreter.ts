@@ -66,8 +66,15 @@ export class EnhancedFleetPulseQueryInterpreter extends FleetPulseQueryInterpret
     return (query: string): boolean => {
       const normalizedQuery = query.toLowerCase().trim();
       
-      // Check keywords
-      const hasKeyword = rule.keywords.some(keyword => normalizedQuery.includes(keyword));
+      // Check keywords with word boundary matching for short words
+      const hasKeyword = rule.keywords.some(keyword => {
+        // Use word boundary matching for short words (3 characters or less)
+        if (keyword.length <= 3) {
+          const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+          return regex.test(normalizedQuery);
+        }
+        return normalizedQuery.includes(keyword);
+      });
       
       // Check intent patterns
       const intentRegexes = rule.intentPatterns.map(pattern => 

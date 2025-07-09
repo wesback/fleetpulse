@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { MCPContextSchema, MCPContextOpenAPISchema, MCPContext } from '../schemas';
 import { logger, logRequest, logResponse, logError, logProxyRequest } from '../logger';
 import { config } from '../config';
+import { createEnhancedInterpreter, loadOpenApiSpec } from '../services/enhanced-query-interpreter';
 import { FleetPulseQueryInterpreter } from '../services/query-interpreter';
 
 /**
@@ -16,8 +17,28 @@ export class MCPRoutes {
 
   constructor() {
     this.router = express.Router();
+    // Initialize with basic interpreter first
     this.queryInterpreter = new FleetPulseQueryInterpreter(config.fleetpulse.apiUrl);
     this.setupRoutes();
+    // Try to upgrade to enhanced interpreter asynchronously
+    this.upgradeToEnhancedInterpreter();
+  }
+
+  /**
+   * Upgrade to enhanced interpreter with OpenAPI spec
+   */
+  private async upgradeToEnhancedInterpreter(): Promise<void> {
+    try {
+      // Try to load FleetPulse OpenAPI spec for enhanced routing
+      const fleetPulseApiUrl = `${config.fleetpulse.apiUrl}/openapi.json`;
+      const openApiSpec = await loadOpenApiSpec(fleetPulseApiUrl);
+      
+      this.queryInterpreter = createEnhancedInterpreter(config.fleetpulse.apiUrl, openApiSpec);
+      logger.info('Enhanced query interpreter initialized', { apiUrl: config.fleetpulse.apiUrl });
+    } catch (error) {
+      // Continue with basic interpreter if OpenAPI spec loading fails
+      logger.warn('Failed to load OpenAPI spec, using basic interpreter', { error });
+    }
   }
 
   /**

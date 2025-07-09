@@ -168,7 +168,7 @@ export class OpenAPIAnalyzer {
       }
     }
 
-    return [...new Set(patterns)];
+    return Array.from(new Set(patterns));
   }
 
   /**

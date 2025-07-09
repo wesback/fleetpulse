@@ -28,6 +28,16 @@ export class FleetPulseQueryInterpreter {
     const normalizedQuery = query.toLowerCase().trim();
     
     try {
+      // Debug logging
+      logger.info('Query interpretation debug', {
+        originalQuery: query,
+        normalizedQuery,
+        isHealth: this.isHealthQuery(normalizedQuery),
+        isPackageUpdate: this.isPackageUpdateQuery(normalizedQuery),
+        isStatistics: this.isStatisticsQuery(normalizedQuery),
+        isHost: this.isHostQuery(normalizedQuery)
+      });
+
       // Health and status queries
       if (this.isHealthQuery(normalizedQuery)) {
         return await this.handleHealthQuery();
@@ -81,8 +91,14 @@ export class FleetPulseQueryInterpreter {
   }
 
   private isHealthQuery(query: string): boolean {
-    const healthKeywords = ['health', 'status', 'up', 'running', 'operational', 'working'];
-    return healthKeywords.some(keyword => query.includes(keyword));
+    const healthKeywords = ['health', 'status', 'running', 'operational', 'working'];
+    
+    // Check for "up" as a standalone word only (not part of upgrade, update, etc.)
+    const standaloneUp = /\bis\s+(?:the\s+)?(?:system|server|service|backend|api)\s+up\b/i.test(query) ||
+                         /\bup\s+(?:and\s+)?(?:running|operational)\b/i.test(query) ||
+                         /\bsystem\s+up\b/i.test(query);
+    
+    return healthKeywords.some(keyword => query.includes(keyword)) || standaloneUp;
   }
 
   private isStatisticsQuery(query: string): boolean {
