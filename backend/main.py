@@ -44,7 +44,7 @@ except ImportError:
 
 # Import our modular components
 from backend.db.engine import get_engine
-from backend.utils.constants import DATA_DIR, DB_PATH
+from backend.utils import constants
 from backend.routers import reports, hosts, statistics, health
 # Import models to ensure they're registered with SQLModel metadata
 from backend.models import database
@@ -64,14 +64,18 @@ async def lifespan(app: FastAPI):
         # Initialize OpenTelemetry first
         initialize_telemetry()
         
-        logger.info(f"Data directory: {DATA_DIR}")
-        logger.info(f"Database path: {DB_PATH}")
+        # Use current values from constants module to allow test patching
+        data_dir = constants.DATA_DIR
+        db_path = constants.DB_PATH
+        
+        logger.info(f"Data directory: {data_dir}")
+        logger.info(f"Database path: {db_path}")
         
         # Check if data directory exists and permissions
-        if os.path.exists(DATA_DIR):
-            logger.info(f"Data directory exists: {DATA_DIR}")
+        if os.path.exists(data_dir):
+            logger.info(f"Data directory exists: {data_dir}")
             # Check if we can write to it
-            test_file = os.path.join(DATA_DIR, "test_write.tmp")
+            test_file = os.path.join(data_dir, "test_write.tmp")
             try:
                 with open(test_file, 'w') as f:
                     f.write("test")
@@ -81,10 +85,10 @@ async def lifespan(app: FastAPI):
                 logger.error(f"Cannot write to data directory: {e}")
                 raise
         else:
-            logger.info(f"Creating data directory: {DATA_DIR}")
+            logger.info(f"Creating data directory: {data_dir}")
         
-        os.makedirs(DATA_DIR, exist_ok=True)
-        logger.info(f"Data directory ensured: {DATA_DIR}")
+        os.makedirs(data_dir, exist_ok=True)
+        logger.info(f"Data directory ensured: {data_dir}")
         
         # Initialize database tables
         force_recreate = os.environ.get("FORCE_DB_RECREATE", "false").lower() == "true"
@@ -97,7 +101,7 @@ async def lifespan(app: FastAPI):
             logger.info("Database tables recreated successfully")
         else:
             # Check if database exists and has tables
-            db_exists = os.path.exists(DB_PATH) and os.path.getsize(DB_PATH) > 0
+            db_exists = os.path.exists(db_path) and os.path.getsize(db_path) > 0
             
             if db_exists:
                 # Check if our main table exists
