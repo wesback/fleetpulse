@@ -16,18 +16,22 @@ import {
   TableRow,
   CircularProgress,
   TextField,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   Button,
   Chip,
   Stack,
   Pagination,
+  Switch,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormControlLabel,
+  Badge,
 } from '@mui/material';
 import DnsIcon from '@mui/icons-material/Dns';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ClearIcon from '@mui/icons-material/Clear';
+import TodayIcon from '@mui/icons-material/Today';
 
 const API_BASE = '/api';
 
@@ -41,11 +45,24 @@ const HostsPage = () => {
   const [loading, setLoading] = useState(false);
   const isMountedRef = useRef(true);
   
+  // Today's updates state
+  const [showTodayUpdates, setShowTodayUpdates] = useState(false);
+  const [todayUpdates, setTodayUpdates] = useState([]);
+  const [todayUpdatesLoading, setTodayUpdatesLoading] = useState(false);
+  const [todayFilters, setTodayFilters] = useState({
+    hostname: '',
+    package: ''
+  });
+  const [todayPagination, setTodayPagination] = useState({
+    page: 1,
+    pageSize: 25,
+    total: 0
+  });
+  
   // Filter state
   const [filters, setFilters] = useState({
     dateFrom: '',
     dateTo: '',
-    os: '',
     package: ''
   });
   
@@ -56,7 +73,7 @@ const HostsPage = () => {
     total: 0           // Total number of items
   });
   
-  // Available OS options for dropdown (populated from data)
+  // Available OS options for dropdown (no longer needed but keeping variable for safety)
   const [availableOSes, setAvailableOSes] = useState([]);
 
   useEffect(() => {
@@ -83,6 +100,53 @@ const HostsPage = () => {
     }
   }, []);
 
+  const fetchTodayUpdates = useCallback(async (currentFilters = todayFilters, currentPage = 1) => {
+    setTodayUpdatesLoading(true);
+    
+    try {
+      // Calculate offset based on page and pageSize
+      const offset = (currentPage - 1) * todayPagination.pageSize;
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (currentFilters.hostname) params.append('hostname', currentFilters.hostname);
+      if (currentFilters.package) params.append('package', currentFilters.package);
+      
+      // Add pagination parameters
+      params.append('limit', todayPagination.pageSize.toString());
+      params.append('offset', offset.toString());
+      
+      const queryString = params.toString();
+      const url = `${API_BASE}/today-updates?${queryString}`;
+      
+      const response = await axios.get(url);
+      const data = response.data;
+      
+      if (isMountedRef.current) {
+        setTodayUpdates(data.items || []);
+        setTodayPagination(prev => ({
+          ...prev,
+          page: currentPage,
+          total: data.total || 0
+        }));
+      }
+    } catch (err) {
+      console.error('Error fetching today\'s updates:', err);
+      if (isMountedRef.current) {
+        setTodayUpdates([]);
+        setTodayPagination(prev => ({
+          ...prev,
+          page: currentPage,
+          total: 0
+        }));
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setTodayUpdatesLoading(false);
+      }
+    }
+  }, [todayFilters, todayPagination.pageSize]);
+
   const fetchHistory = useCallback(async (host, currentFilters = filters, currentPage = 1) => {
     setLoading(true);
     setSelectedHost(host);
@@ -95,7 +159,6 @@ const HostsPage = () => {
       const params = new URLSearchParams();
       if (currentFilters.dateFrom) params.append('date_from', currentFilters.dateFrom);
       if (currentFilters.dateTo) params.append('date_to', currentFilters.dateTo);
-      if (currentFilters.os) params.append('os', currentFilters.os);
       if (currentFilters.package) params.append('package', currentFilters.package);
       
       // Add pagination parameters
@@ -116,21 +179,21 @@ const HostsPage = () => {
           total: data.total || 0
         }));
         
-        // Extract unique OS values for dropdown from current page
-        const osSet = new Set((data.items || []).map(item => item.os));
-        const currentOSes = Array.from(osSet);
+        // Extract unique OS values for dropdown from current page - NO LONGER NEEDED
+        // const osSet = new Set((data.items || []).map(item => item.os));
+        // const currentOSes = Array.from(osSet);
         
-        // Merge with existing OS options to preserve them across filter operations
-        setAvailableOSes(prev => {
-          const combinedSet = new Set([...prev, ...currentOSes]);
-          return Array.from(combinedSet).sort();
-        });
+        // Merge with existing OS options to preserve them across filter operations - NO LONGER NEEDED
+        // setAvailableOSes(prev => {
+        //   const combinedSet = new Set([...prev, ...currentOSes]);
+        //   return Array.from(combinedSet).sort();
+        // });
       }
     } catch (err) {
       console.error('Error fetching history:', err);
       if (isMountedRef.current) {
         setHistory([]);
-        // Don't clear availableOSes on filter errors to preserve dropdown options
+        // Don't clear availableOSes on filter errors to preserve dropdown options - NO LONGER NEEDED
         setPagination(prev => ({
           ...prev,
           page: currentPage,
@@ -161,7 +224,6 @@ const HostsPage = () => {
     const emptyFilters = {
       dateFrom: '',
       dateTo: '',
-      os: '',
       package: ''
     };
     setFilters(emptyFilters);
@@ -182,13 +244,226 @@ const HostsPage = () => {
     }
   };
   
-  const hasActiveFilters = filters.dateFrom || filters.dateTo || filters.os || filters.package;
+  const handleTodayFilterChange = (filterName, value) => {
+    const newFilters = { ...todayFilters, [filterName]: value };
+    setTodayFilters(newFilters);
+    
+    // Reset to page 1 when filters change
+    setTodayPagination(prev => ({ ...prev, page: 1 }));
+    
+    // Re-fetch with new filters if today updates are shown
+    if (showTodayUpdates) {
+      fetchTodayUpdates(newFilters, 1);
+    }
+  };
+  
+  const clearTodayFilters = () => {
+    const emptyFilters = {
+      hostname: '',
+      package: ''
+    };
+    setTodayFilters(emptyFilters);
+    
+    // Reset to page 1 when clearing filters
+    setTodayPagination(prev => ({ ...prev, page: 1 }));
+    
+    // Re-fetch without filters if today updates are shown
+    if (showTodayUpdates) {
+      fetchTodayUpdates(emptyFilters, 1);
+    }
+  };
+  
+  const handleTodayPageChange = (event, page) => {
+    setTodayPagination(prev => ({ ...prev, page }));
+    fetchTodayUpdates(todayFilters, page);
+  };
+  
+  const handleTodayToggle = (event) => {
+    const enabled = event.target.checked;
+    setShowTodayUpdates(enabled);
+    
+    if (enabled) {
+      // Fetch today's updates when enabled
+      fetchTodayUpdates(todayFilters, 1);
+    }
+  };
+  
+  const hasActiveFilters = filters.dateFrom || filters.dateTo || filters.package;
+  const hasTodayActiveFilters = todayFilters.hostname || todayFilters.package;
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Typography variant="h4" component="h1" gutterBottom>
         Host Management
       </Typography>
+      
+      {/* Today's Updates Section */}
+      <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          <TodayIcon sx={{ mr: 1 }} />
+          <Typography variant="h6">Today's Updates</Typography>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={showTodayUpdates}
+                onChange={handleTodayToggle}
+                color="primary"
+              />
+            }
+            label="Show Today's Updates"
+            sx={{ ml: 2 }}
+          />
+          {showTodayUpdates && todayPagination.total > 0 && (
+            <Badge 
+              badgeContent={todayPagination.total} 
+              color="primary" 
+              sx={{ ml: 2 }}
+            >
+              <Chip 
+                label="Updates" 
+                size="small" 
+                color="primary" 
+                variant="outlined"
+              />
+            </Badge>
+          )}
+        </Box>
+        
+        {showTodayUpdates && (
+          <>
+            {/* Today's Updates Filter Controls */}
+            <Paper elevation={1} sx={{ p: 2, mb: 2, backgroundColor: 'background.default' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <FilterListIcon sx={{ mr: 1 }} />
+                <Typography variant="h6">Filters</Typography>
+                {hasTodayActiveFilters && (
+                  <Chip 
+                    label="Active" 
+                    color="primary" 
+                    size="small" 
+                    sx={{ ml: 1 }}
+                  />
+                )}
+              </Box>
+              
+              <Stack spacing={2}>
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                  <FormControl size="small" sx={{ minWidth: 200 }}>
+                    <InputLabel id="today-host-filter-label">Host</InputLabel>
+                    <Select
+                      labelId="today-host-filter-label"
+                      id="today-host-filter"
+                      value={todayFilters.hostname}
+                      label="Host"
+                      onChange={(e) => handleTodayFilterChange('hostname', e.target.value)}
+                    >
+                      <MenuItem value="">
+                        <em>All Hosts</em>
+                      </MenuItem>
+                      {hosts.map((host) => (
+                        <MenuItem key={host} value={host}>
+                          {host}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  
+                  <TextField
+                    label="Package Name"
+                    value={todayFilters.package}
+                    onChange={(e) => handleTodayFilterChange('package', e.target.value)}
+                    size="small"
+                    placeholder="Search packages..."
+                    sx={{ minWidth: 200 }}
+                  />
+                </Stack>
+                
+                <Box>
+                  <Button
+                    variant="outlined"
+                    startIcon={<ClearIcon />}
+                    onClick={clearTodayFilters}
+                    disabled={!hasTodayActiveFilters}
+                    size="small"
+                  >
+                    Clear Filters
+                  </Button>
+                </Box>
+              </Stack>
+            </Paper>
+            
+            {/* Today's Updates Table */}
+            {todayUpdatesLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <>
+                {todayUpdates.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    {hasTodayActiveFilters 
+                      ? "No updates found for today matching the current filters."
+                      : "No package updates occurred today."
+                    }
+                  </Typography>
+                ) : (
+                  <>
+                    <Box sx={{ mb: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Showing {todayUpdates.length} of {todayPagination.total} update{todayPagination.total !== 1 ? 's' : ''} from today
+                        {hasTodayActiveFilters && ' (filtered)'}
+                        {todayPagination.total > todayPagination.pageSize && ` • Page ${todayPagination.page} of ${Math.ceil(todayPagination.total / todayPagination.pageSize)}`}
+                      </Typography>
+                    </Box>
+                    
+                    <TableContainer component={Paper} elevation={1}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Host</TableCell>
+                            <TableCell>Date</TableCell>
+                            <TableCell>OS</TableCell>
+                            <TableCell>Package</TableCell>
+                            <TableCell>Old Version</TableCell>
+                            <TableCell>New Version</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {todayUpdates.map((rec, i) => (
+                            <TableRow key={i} hover>
+                              <TableCell>{rec.hostname}</TableCell>
+                              <TableCell>{rec.update_date}</TableCell>
+                              <TableCell>{rec.os}</TableCell>
+                              <TableCell>{rec.name}</TableCell>
+                              <TableCell>{rec.old_version}</TableCell>
+                              <TableCell>{rec.new_version}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                    
+                    {/* Today's Updates Pagination Controls */}
+                    {todayPagination.total > todayPagination.pageSize && (
+                      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                        <Pagination
+                          count={Math.ceil(todayPagination.total / todayPagination.pageSize)}
+                          page={todayPagination.page}
+                          onChange={handleTodayPageChange}
+                          color="primary"
+                          showFirstButton
+                          showLastButton
+                          size="small"
+                        />
+                      </Box>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </Paper>
       
       <Box sx={{ display: 'flex', gap: 4 }}>
         <Paper elevation={2} sx={{ width: 300, minHeight: 400, padding: 2 }}>
@@ -211,11 +486,10 @@ const HostsPage = () => {
                   const emptyFilters = {
                     dateFrom: '',
                     dateTo: '',
-                    os: '',
                     package: ''
                   };
                   setFilters(emptyFilters);
-                  setAvailableOSes([]); // Clear OS options when switching hosts
+                  setAvailableOSes([]); // Clear OS options when switching hosts - NO LONGER NEEDED BUT KEEPING FOR SAFETY
                   setPagination(prev => ({ ...prev, page: 1 }));
                   fetchHistory(host, emptyFilters, 1);
                 }}
@@ -276,26 +550,6 @@ const HostsPage = () => {
                       size="small"
                       sx={{ minWidth: 150 }}
                     />
-                    
-                    <FormControl size="small" sx={{ minWidth: 200 }}>
-                      <InputLabel id="os-filter-label">Operating System</InputLabel>
-                      <Select
-                        labelId="os-filter-label"
-                        id="os-filter"
-                        value={filters.os}
-                        label="Operating System"
-                        onChange={(e) => handleFilterChange('os', e.target.value)}
-                      >
-                        <MenuItem value="">
-                          <em>All</em>
-                        </MenuItem>
-                        {availableOSes.map((os) => (
-                          <MenuItem key={os} value={os}>
-                            {os}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
                     
                     <TextField
                       label="Package Name"
