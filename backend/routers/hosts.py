@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlmodel import Session, select, func
 from typing import List, Dict, Optional
-from datetime import date
+from datetime import date, datetime
 from backend.models.schemas import HostInfo, PaginatedResponse
 from backend.models.database import PackageUpdate
 from backend.db.session import get_session
@@ -199,4 +199,97 @@ def last_updates(session: Session = Depends(get_session)):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to retrieve last updates"
+            )
+
+
+@router.get("/today-updates", response_model=PaginatedResponse)
+def today_updates(
+    session: Session = Depends(get_session),
+    hostname: Optional[str] = Query(None, description="Filter by specific hostname"),
+    package: Optional[str] = Query(None, description="Filter by package name (partial match)"),
+    limit: int = Query(50, ge=1, le=1000, description="Number of items per page"),
+    offset: int = Query(0, ge=0, description="Number of items to skip")
+):
+    """Get all package updates that occurred today across all hosts or for a specific host."""
+    with create_business_span("today_updates", 
+                             hostname=hostname or "all",
+                             package_filter=package or "none",
+                             limit=limit,
+                             offset=offset) as span:
+        try:
+            # Get today's date
+            today = datetime.now().date()
+            
+            # Validate hostname if provided
+            if hostname and not validate_hostname(hostname):
+                span.set_attribute("validation.error", "invalid_hostname")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid hostname format"
+                )
+            
+            # Validate package name if provided
+            if package and not validate_package_name(package):
+                span.set_attribute("validation.error", "invalid_package_name")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid package name format"
+                )
+            
+            span.set_attribute("validation.passed", True)
+            span.set_attribute("filter.date", str(today))
+            
+            # Build base query for today's updates
+            base_query = select(PackageUpdate).where(PackageUpdate.update_date == today)
+            
+            if hostname:
+                base_query = base_query.where(PackageUpdate.hostname == hostname)
+                span.set_attribute("filter.hostname", hostname)
+            
+            if package:
+                # Use SQL LIKE for partial matching (case-insensitive)
+                base_query = base_query.where(PackageUpdate.name.ilike(f"%{package}%"))
+                span.set_attribute("filter.package", package)
+            
+            # Get total count of items matching filters
+            count_query = select(func.count()).select_from(
+                base_query.subquery()
+            )
+            total = session.exec(count_query).one()
+            
+            # Apply ordering and pagination to the main query
+            paginated_query = (
+                base_query
+                .order_by(PackageUpdate.update_date.desc(), PackageUpdate.hostname.asc(), PackageUpdate.id.desc())
+                .offset(offset)
+                .limit(limit)
+            )
+            
+            result = session.exec(paginated_query).all()
+            
+            # Record telemetry
+            record_host_query_metrics("today_updates", hostname=hostname or "all", result_count=len(result))
+            span.set_attribute("result.total", total)
+            span.set_attribute("result.returned", len(result))
+            span.set_attribute("operation.success", True)
+            
+            logger.info(f"Retrieved {len(result)}/{total} today's updates for {hostname or 'all hosts'}")
+            
+            return PaginatedResponse(
+                items=result,
+                total=total,
+                limit=limit,
+                offset=offset
+            )
+            
+        except HTTPException:
+            span.set_attribute("operation.success", False)
+            raise
+        except Exception as e:
+            span.set_attribute("operation.success", False)
+            span.set_attribute("error.message", str(e))
+            logger.error(f"Error getting today's updates: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve today's updates"
             )

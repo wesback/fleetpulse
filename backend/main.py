@@ -201,10 +201,10 @@ async def general_exception_handler(request, exc):
 
 
 # Include routers
-app.include_router(reports.router, tags=["reports"])
-app.include_router(hosts.router, tags=["hosts"])
-app.include_router(statistics.router, tags=["statistics"])
-app.include_router(health.router, tags=["health"])
+app.include_router(reports.router, prefix="/api", tags=["reports"])
+app.include_router(hosts.router, prefix="/api", tags=["hosts"])
+app.include_router(statistics.router, prefix="/api", tags=["statistics"])
+app.include_router(health.router, tags=["health"])  # health check should remain at root level
 
 
 if __name__ == "__main__":
