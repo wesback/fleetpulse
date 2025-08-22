@@ -9,6 +9,8 @@ import {
   CardContent,
   CircularProgress,
   Alert,
+  Button,
+  Snackbar,
   useTheme,
 } from '@mui/material';
 import {
@@ -51,6 +53,8 @@ const StatisticsPage = () => {
   const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [sampleDataLoading, setSampleDataLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const theme = useTheme();
 
   useEffect(() => {
@@ -68,6 +72,31 @@ const StatisticsPage = () => {
       setError(err.response?.data?.detail || 'Failed to load statistics');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const generateSampleData = async () => {
+    try {
+      setSampleDataLoading(true);
+      await axios.post(`${API_BASE}/demo/sample-data`);
+      setSnackbar({
+        open: true,
+        message: 'Sample data generated successfully! Refreshing statistics...',
+        severity: 'success'
+      });
+      // Refresh statistics after generating sample data
+      setTimeout(() => {
+        fetchStatistics();
+      }, 1000);
+    } catch (err) {
+      console.error('Error generating sample data:', err);
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.detail || 'Failed to generate sample data',
+        severity: 'error'
+      });
+    } finally {
+      setSampleDataLoading(false);
     }
   };
 
@@ -221,11 +250,41 @@ const StatisticsPage = () => {
     },
   };
 
+  // Check if we have any data
+  const hasData = statistics && (statistics.total_hosts > 0 || statistics.total_updates > 0);
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Typography variant="h4" component="h1" gutterBottom>
         Fleet Statistics
       </Typography>
+      
+      {!hasData && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Welcome to FleetPulse!
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            No package update data has been received yet. To start seeing metrics:
+          </Typography>
+          <Typography variant="body2" component="div" sx={{ mb: 2 }}>
+            • Configure your hosts to submit update reports to <strong>/report</strong> endpoint
+            <br />
+            • Use the provided Ansible playbooks or curl commands to send data
+            <br />
+            • Check the documentation for integration examples
+          </Typography>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={generateSampleData}
+            disabled={sampleDataLoading}
+            startIcon={sampleDataLoading ? <CircularProgress size={20} /> : null}
+          >
+            {sampleDataLoading ? 'Generating...' : 'Generate Sample Data'}
+          </Button>
+        </Alert>
+      )}
       
       {/* Summary Cards */}
 
@@ -281,60 +340,78 @@ const StatisticsPage = () => {
       </Box>
 
       {/* Charts */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {/* First Row */}
-        <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-          {/* Updates Timeline */}
-          <Paper elevation={2} sx={{ p: 2, height: 400, flex: '2 1 600px' }}>
+      {hasData ? (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {/* First Row */}
+          <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            {/* Updates Timeline */}
+            <Paper elevation={2} sx={{ p: 2, height: 400, flex: '2 1 600px' }}>
+              <Typography variant="h6" gutterBottom>
+                Updates Timeline (Last 30 Days)
+              </Typography>
+              <Box sx={{ height: 300 }}>
+                <Line data={timelineData} options={timelineOptions} />
+              </Box>
+            </Paper>
 
-            <Typography variant="h6" gutterBottom>
-              Updates Timeline (Last 30 Days)
-            </Typography>
-            <Box sx={{ height: 300 }}>
-              <Line data={timelineData} options={timelineOptions} />
-            </Box>
-          </Paper>
+            {/* OS Distribution */}
+            <Paper elevation={2} sx={{ p: 2, height: 400, flex: '1 1 300px' }}>
+              <Typography variant="h6" gutterBottom>
+                Updates by Operating System
+              </Typography>
+              <Box sx={{ height: 300 }}>
+                <Doughnut data={osDistributionData} options={doughnutOptions} />
+              </Box>
+            </Paper>
+          </Box>
 
+          {/* Second Row */}
+          <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            {/* Top Packages */}
+            <Paper elevation={2} sx={{ p: 2, height: 400, flex: '1 1 calc(50% - 12px)' }}>
+              <Typography variant="h6" gutterBottom>
+                Most Updated Packages
+              </Typography>
+              <Box sx={{ height: 300 }}>
+                <Bar data={topPackagesData} options={chartOptions} />
+              </Box>
+            </Paper>
 
-          {/* OS Distribution */}
-          <Paper elevation={2} sx={{ p: 2, height: 400, flex: '1 1 300px' }}>
-
-            <Typography variant="h6" gutterBottom>
-              Updates by Operating System
-            </Typography>
-            <Box sx={{ height: 300 }}>
-              <Doughnut data={osDistributionData} options={doughnutOptions} />
-            </Box>
-          </Paper>
+            {/* Host Activity */}
+            <Paper elevation={2} sx={{ p: 2, height: 400, flex: '1 1 calc(50% - 12px)' }}>
+              <Typography variant="h6" gutterBottom>
+                Most Active Hosts
+              </Typography>
+              <Box sx={{ height: 300 }}>
+                <Bar data={hostActivityData} options={chartOptions} />
+              </Box>
+            </Paper>
+          </Box>
         </Box>
+      ) : (
+        <Paper elevation={2} sx={{ p: 4, textAlign: 'center', mt: 3 }}>
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            Charts will appear here once you have data
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Submit your first package update report to see timeline trends, OS distribution, and activity charts.
+          </Typography>
+        </Paper>
+      )}
 
-
-        {/* Second Row */}
-        <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-          {/* Top Packages */}
-          <Paper elevation={2} sx={{ p: 2, height: 400, flex: '1 1 calc(50% - 12px)' }}>
-
-            <Typography variant="h6" gutterBottom>
-              Most Updated Packages
-            </Typography>
-            <Box sx={{ height: 300 }}>
-              <Bar data={topPackagesData} options={chartOptions} />
-            </Box>
-          </Paper>
-
-
-          {/* Host Activity */}
-          <Paper elevation={2} sx={{ p: 2, height: 400, flex: '1 1 calc(50% - 12px)' }}>
-
-            <Typography variant="h6" gutterBottom>
-              Most Active Hosts
-            </Typography>
-            <Box sx={{ height: 300 }}>
-              <Bar data={hostActivityData} options={chartOptions} />
-            </Box>
-          </Paper>
-        </Box>
-      </Box>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+      >
+        <Alert 
+          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 };
