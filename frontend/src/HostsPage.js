@@ -473,9 +473,14 @@ const HostsPage = () => {
           </Typography>
           <List>
             {hosts.length === 0 && (
-              <Typography variant="body2" color="text.secondary">
-                No hosts found.
-              </Typography>
+              <Box sx={{ p: 2, textAlign: 'center' }}>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  No hosts found
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                  Hosts will appear here after they submit update reports to the /report endpoint
+                </Typography>
+              </Box>
             )}
             {hosts.map(host => (
               <ListItemButton
