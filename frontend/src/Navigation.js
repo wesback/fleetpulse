@@ -13,6 +13,7 @@ import {
 import StorageIcon from '@mui/icons-material/Storage';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import DnsIcon from '@mui/icons-material/Dns';
+import TodayIcon from '@mui/icons-material/Today';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 
@@ -27,7 +28,7 @@ const Navigation = ({ mode, toggleTheme }) => {
   const currentPath = location.pathname === '/' ? '/statistics' : location.pathname;
   
   // Ensure the tab value is always one of the valid tab values
-  const tabValue = ['/statistics', '/hosts'].includes(currentPath) ? currentPath : '/statistics';
+  const tabValue = ['/statistics', '/today-updates', '/hosts'].includes(currentPath) ? currentPath : '/statistics';
   
   const handleTabChange = (event, newValue) => {
     navigate(newValue);
@@ -60,6 +61,12 @@ const Navigation = ({ mode, toggleTheme }) => {
               value="/statistics" 
               label="Statistics" 
               icon={<BarChartIcon />}
+              iconPosition="start"
+            />
+            <Tab 
+              value="/today-updates" 
+              label="Today's Updates" 
+              icon={<TodayIcon />}
               iconPosition="start"
             />
             <Tab 

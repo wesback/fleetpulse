@@ -9,6 +9,7 @@ import {
 import Navigation from './Navigation';
 import StatisticsPage from './StatisticsPage';
 import HostsPage from './HostsPage';
+import TodayUpdatesPage from './TodayUpdatesPage';
 
 // Theme Context
 const ThemeContext = createContext();
@@ -91,6 +92,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/statistics" replace />} />
         <Route path="/statistics" element={<StatisticsPage />} />
+        <Route path="/today-updates" element={<TodayUpdatesPage />} />
         <Route path="/hosts" element={<HostsPage />} />
       </Routes>
     </Router>
