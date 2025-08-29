@@ -25,3 +25,6 @@ opentelemetry-exporter-jaeger==1.21.0
 # OpenTelemetry propagators - aligned versions
 opentelemetry-propagator-b3==1.28.2
 opentelemetry-propagator-jaeger==1.28.2
+
+# Prometheus client for metrics exposition
+prometheus_client==0.21.1

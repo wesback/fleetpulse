@@ -371,6 +371,16 @@ def record_request_metrics(method: str, endpoint: str, status_code: int, duratio
                 "status_code": str(status_code),
             }
             error_counter.add(1, error_labels)
+    
+    # Also record in Prometheus format
+    try:
+        from backend.metrics.prometheus import record_prometheus_http_metrics
+        record_prometheus_http_metrics(method, endpoint, status_code, duration_ms)
+    except ImportError:
+        # Prometheus metrics not available
+        pass
+    except Exception as e:
+        logger.error(f"Failed to record Prometheus HTTP metrics: {e}")
 
 
 def record_package_update_metrics(hostname: str, package_count: int):
@@ -380,6 +390,16 @@ def record_package_update_metrics(hostname: str, package_count: int):
             "hostname": hostname,
         }
         package_updates_counter.add(package_count, labels)
+    
+    # Also record in Prometheus format
+    try:
+        from backend.metrics.prometheus import record_prometheus_package_update
+        record_prometheus_package_update(hostname, package_count)
+    except ImportError:
+        # Prometheus metrics not available
+        pass
+    except Exception as e:
+        logger.error(f"Failed to record Prometheus package update metrics: {e}")
 
 
 def record_host_metrics(hostname: str, operation: str = "add"):

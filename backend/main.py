@@ -45,7 +45,7 @@ except ImportError:
 # Import our modular components
 from backend.db.engine import get_engine
 from backend.utils import constants
-from backend.routers import reports, hosts, statistics, health, demo
+from backend.routers import reports, hosts, statistics, health, demo, metrics
 # Import models to ensure they're registered with SQLModel metadata
 from backend.models import database
 
@@ -206,6 +206,7 @@ app.include_router(hosts.router, prefix="/api", tags=["hosts"])
 app.include_router(statistics.router, prefix="/api", tags=["statistics"])
 app.include_router(demo.router, prefix="/api", tags=["demo"])  # Demo endpoints for sample data
 app.include_router(health.router, tags=["health"])  # health check should remain at root level
+app.include_router(metrics.router, tags=["metrics"])  # Prometheus metrics endpoint
 
 
 if __name__ == "__main__":
