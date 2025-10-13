@@ -42,6 +42,12 @@ services:
     ports:
       - "8080:80"  # Frontend UI
     restart: unless-stopped
+    environment:
+      # Backend URL configuration
+      # Default: /api (uses nginx proxy to backend service)
+      # For direct backend access: http://backend:8000/api
+      # For external backend: https://your-backend.example.com/api
+      - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL:-/api}
     depends_on:
       - backend
     networks:

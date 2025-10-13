@@ -26,8 +26,9 @@ import {
 import TodayIcon from '@mui/icons-material/Today';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ClearIcon from '@mui/icons-material/Clear';
+import config from './config';
 
-const API_BASE = '/api';
+const API_BASE = config.API_BASE_URL;
 
 /**
  * Today's Updates page component for viewing all package updates from today

@@ -29,6 +29,7 @@ import {
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import axios from 'axios';
 import 'chartjs-adapter-date-fns';
+import config from './config';
 
 // Register Chart.js components
 ChartJS.register(
@@ -44,7 +45,7 @@ ChartJS.register(
   TimeScale
 );
 
-const API_BASE = '/api';
+const API_BASE = config.API_BASE_URL;
 
 /**
  * Statistics page component showing various analytics and charts
