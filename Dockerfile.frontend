@@ -10,8 +10,8 @@ WORKDIR /app
 # Copy package files first for better layer caching
 COPY frontend/package*.json ./
 
-# Install dependencies with npm ci for production builds
-RUN npm ci --only=production --silent
+# Install dependencies (including devDependencies needed for build)
+RUN npm ci --silent
 
 # Copy source code
 COPY frontend/ ./
