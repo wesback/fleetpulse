@@ -136,6 +136,40 @@ FleetPulse publishes separate Docker images for frontend and backend:
 
 Use the provided `docker-compose.sample.yml` for production deployments with pre-built images.
 
+### Kubernetes and Cloud-Native Deployments
+
+FleetPulse supports **configurable backend URLs**, making it seamless to deploy on Kubernetes, cloud platforms, or any orchestration system where services are addressed differently than in Docker Compose.
+
+#### Key Features
+
+- ✅ **Runtime Configuration**: Backend URL configured at container startup via environment variables
+- ✅ **No Rebuild Required**: Change backend URL without rebuilding images
+- ✅ **Kubernetes Native**: Works with Kubernetes services, ingress, and service mesh
+- ✅ **Backward Compatible**: Defaults to `/api` for nginx proxy mode
+
+#### Frontend Configuration
+
+Configure the frontend to connect to your backend by setting the `REACT_APP_BACKEND_URL` environment variable:
+
+```yaml
+# Kubernetes example
+env:
+- name: REACT_APP_BACKEND_URL
+  value: http://fleetpulse-backend:8000/api
+
+# Docker Compose with direct backend access
+environment:
+  - REACT_APP_BACKEND_URL=http://backend:8000/api
+
+# External backend
+environment:
+  - REACT_APP_BACKEND_URL=https://api.example.com/api
+```
+
+**Default**: `/api` (uses nginx proxy to backend - recommended for docker-compose)
+
+For complete Kubernetes deployment examples with ingress, services, and ConfigMaps, see [KUBERNETES_DEPLOYMENT.md](./KUBERNETES_DEPLOYMENT.md).
+
 **High-traffic production:**
 ```bash
 DEPLOYMENT_MODE=gunicorn

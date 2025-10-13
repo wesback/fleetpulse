@@ -30,8 +30,9 @@ import {
 import DnsIcon from '@mui/icons-material/Dns';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ClearIcon from '@mui/icons-material/Clear';
+import config from './config';
 
-const API_BASE = '/api';
+const API_BASE = config.API_BASE_URL;
 
 /**
  * Hosts page component for viewing host details and update history

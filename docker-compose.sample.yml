@@ -33,6 +33,12 @@ services:
     container_name: fleetpulse-frontend
     ports:
       - "8080:80"  # Frontend UI
+    environment:
+      # Backend URL configuration
+      # Default: /api (uses nginx proxy to backend service)
+      # For direct backend access: http://backend:8000/api
+      # For Kubernetes or external backend: https://your-backend.example.com/api
+      - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL:-/api}
     depends_on:
       - backend
     restart: unless-stopped
