@@ -1,0 +1,362 @@
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fleetpulse
+---
+# Backend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: fleetpulse-backend
+  namespace: fleetpulse
+spec:
+  selector:
+    app: fleetpulse-backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP
+---
+# Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: fleetpulse-frontend
+  namespace: fleetpulse
+spec:
+  selector:
+    app: fleetpulse-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+  type: LoadBalancer
+---
+# Jaeger Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: fleetpulse-jaeger
+  namespace: fleetpulse
+spec:
+  selector:
+    app: fleetpulse-jaeger
+  ports:
+    - name: ui
+      port: 16686
+      targetPort: 16686
+    - name: collector
+      port: 14268
+      targetPort: 14268
+    - name: agent-udp
+      port: 6831
+      targetPort: 6831
+      protocol: UDP
+  type: ClusterIP
+---
+# OTEL Collector Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: fleetpulse-otel-collector
+  namespace: fleetpulse
+spec:
+  selector:
+    app: fleetpulse-otel-collector
+  ports:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+  type: ClusterIP
+---
+# MCP Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: fleetpulse-mcp
+  namespace: fleetpulse
+spec:
+  selector:
+    app: fleetpulse-mcp
+  ports:
+    - name: http
+      port: 8001
+      targetPort: 8001
+  type: ClusterIP
+---
+# PersistentVolumeClaim for data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fleetpulse-data-pvc
+  namespace: fleetpulse
+spec:
+  accessModes:
+    - ReadWriteMany  # Change to ReadWriteOnce if your storage doesn't support RWX
+  resources:
+    requests:
+      storage: 10Gi
+  # Uncomment and modify if you need a specific storage class
+  # storageClassName: local-path  # K3s default storage class
+---
+# ConfigMap for OTEL Collector
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  namespace: fleetpulse
+data:
+  otel-collector-config.yaml: |
+    # Copy your otel-collector-config.yaml content here
+    # Or mount it from a file
+---
+# Backend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleetpulse-backend
+  namespace: fleetpulse
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fleetpulse-backend
+  template:
+    metadata:
+      labels:
+        app: fleetpulse-backend
+    spec:
+      containers:
+      - name: backend
+        image: wesback/fleetpulse-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: FLEETPULSE_DATA_DIR
+          value: /data
+        - name: DEPLOYMENT_MODE
+          value: uvicorn
+        - name: GUNICORN_WORKERS
+          value: "2"
+        - name: OTEL_SERVICE_NAME
+          value: fleetpulse-backend
+        - name: OTEL_SERVICE_VERSION
+          value: "1.0.0"
+        - name: OTEL_ENVIRONMENT
+          value: production
+        - name: OTEL_ENABLE_TELEMETRY
+          value: "true"
+        - name: OTEL_EXPORTER_TYPE
+          value: jaeger
+        - name: OTEL_EXPORTER_JAEGER_ENDPOINT
+          value: http://fleetpulse-jaeger.fleetpulse.svc.cluster.local:14268/api/traces
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://fleetpulse-otel-collector.fleetpulse.svc.cluster.local:4317
+        - name: OTEL_TRACE_SAMPLE_RATE
+          value: "1.0"
+        - name: JAEGER_AGENT_HOST
+          value: fleetpulse-jaeger.fleetpulse.svc.cluster.local
+        - name: JAEGER_AGENT_PORT
+          value: "6831"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: fleetpulse-data-pvc
+---
+# Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleetpulse-frontend
+  namespace: fleetpulse
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fleetpulse-frontend
+  template:
+    metadata:
+      labels:
+        app: fleetpulse-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: wesback/fleetpulse-frontend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+          name: http
+        env:
+        # Configure frontend to use backend service directly
+        # This bypasses the nginx proxy and talks directly to the backend service
+        - name: REACT_APP_BACKEND_URL
+          value: http://fleetpulse-backend:8000/api
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+# Jaeger Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleetpulse-jaeger
+  namespace: fleetpulse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fleetpulse-jaeger
+  template:
+    metadata:
+      labels:
+        app: fleetpulse-jaeger
+    spec:
+      containers:
+      - name: jaeger
+        image: jaegertracing/all-in-one:latest
+        ports:
+        - containerPort: 16686
+          name: ui
+        - containerPort: 14268
+          name: collector
+        - containerPort: 6831
+          name: agent-udp
+          protocol: UDP
+        env:
+        - name: COLLECTOR_OTLP_ENABLED
+          value: "true"
+        - name: COLLECTOR_ZIPKIN_HOST_PORT
+          value: ":9411"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+---
+# OTEL Collector Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleetpulse-otel-collector
+  namespace: fleetpulse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fleetpulse-otel-collector
+  template:
+    metadata:
+      labels:
+        app: fleetpulse-otel-collector
+    spec:
+      containers:
+      - name: otel-collector
+        image: otel/opentelemetry-collector-contrib:latest
+        command: ["--config=/etc/otel-collector-config.yaml"]
+        ports:
+        - containerPort: 4317
+          name: otlp-grpc
+        - containerPort: 4318
+          name: otlp-http
+        volumeMounts:
+        - name: config
+          mountPath: /etc/otel-collector-config.yaml
+          subPath: otel-collector-config.yaml
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: config
+        configMap:
+          name: otel-collector-config
+---
+# MCP Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleetpulse-mcp
+  namespace: fleetpulse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fleetpulse-mcp
+  template:
+    metadata:
+      labels:
+        app: fleetpulse-mcp
+    spec:
+      containers:
+      - name: mcp
+        image: wesback/fleetpulse-mcp:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8001
+          name: http
+        volumeMounts:
+        - name: data
+          mountPath: /data
+          readOnly: true
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: fleetpulse-data-pvc
