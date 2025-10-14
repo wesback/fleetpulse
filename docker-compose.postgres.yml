@@ -1,25 +1,26 @@
 ---
+# Example Docker Compose configuration using PostgreSQL
+# Usage: docker compose -f docker-compose.postgres.yml up -d
 services:
-  # PostgreSQL Database (optional - uncomment to use PostgreSQL instead of SQLite)
-  # postgres:
-  #   image: postgres:16-alpine
-  #   container_name: fleetpulse-postgres
-  #   environment:
-  #     - POSTGRES_DB=fleetpulse
-  #     - POSTGRES_USER=fleetpulse
-  #     - POSTGRES_PASSWORD=fleetpulse
-  #   volumes:
-  #     - postgres-data:/var/lib/postgresql/data
-  #   ports:
-  #     - "5432:5432"
-  #   restart: unless-stopped
-  #   networks:
-  #     - fleetpulse
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U fleetpulse"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  postgres:
+    image: postgres:16-alpine
+    container_name: fleetpulse-postgres
+    environment:
+      - POSTGRES_DB=fleetpulse
+      - POSTGRES_USER=fleetpulse
+      - POSTGRES_PASSWORD=fleetpulse
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - fleetpulse
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fleetpulse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
@@ -29,22 +30,17 @@ services:
         USER_ID: ${USER_ID:-1000}
         GROUP_ID: ${GROUP_ID:-1000}
     container_name: fleetpulse-backend
-    volumes:
-      - ${FLEETPULSE_DATA_PATH:-./data}:/data
     ports:
-      - "8000:8000"  # Backend API
+      - "8000:8000"
     restart: unless-stopped
     environment:
-      # Database configuration
-      - DATABASE_TYPE=${DATABASE_TYPE:-sqlite}
-      - FLEETPULSE_DATA_DIR=/data
-      # PostgreSQL configuration (only used when DATABASE_TYPE=postgresql)
-      # - POSTGRES_HOST=postgres
-      # - POSTGRES_PORT=5432
-      # - POSTGRES_DB=fleetpulse
-      # - POSTGRES_USER=fleetpulse
-      # - POSTGRES_PASSWORD=fleetpulse
-      # - DATABASE_URL=postgresql://fleetpulse:fleetpulse@postgres:5432/fleetpulse
+      # Database configuration - PostgreSQL
+      - DATABASE_TYPE=postgresql
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=fleetpulse
+      - POSTGRES_USER=fleetpulse
+      - POSTGRES_PASSWORD=fleetpulse
       - DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-uvicorn}
       - GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
       # OpenTelemetry configuration
@@ -54,17 +50,19 @@ services:
       - OTEL_ENABLE_TELEMETRY=${OTEL_ENABLE_TELEMETRY:-true}
       - OTEL_EXPORTER_TYPE=${OTEL_EXPORTER_TYPE:-jaeger}
       - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger:14268/api/traces
-      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_TRACE_SAMPLE_RATE=${OTEL_TRACE_SAMPLE_RATE:-1.0}
       - JAEGER_AGENT_HOST=jaeger
       - JAEGER_AGENT_PORT=6831
     networks:
       - fleetpulse
     depends_on:
-      - jaeger
-      - otel-collector
-      # Uncomment when using PostgreSQL
-      # - postgres
+      postgres:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+      otel-collector:
+        condition: service_started
 
   frontend:
     build:
@@ -72,13 +70,9 @@ services:
       dockerfile: Dockerfile.frontend
     container_name: fleetpulse-frontend
     ports:
-      - "8080:80"  # Frontend UI
+      - "8080:80"
     restart: unless-stopped
     environment:
-      # Backend URL configuration
-      # Default: /api (uses nginx proxy to backend service)
-      # For direct backend access: http://backend:8000/api
-      # For external backend: https://your-backend.example.com/api
       - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL:-/api}
     depends_on:
       - backend
@@ -89,11 +83,11 @@ services:
     image: jaegertracing/all-in-one:latest
     container_name: fleetpulse-jaeger
     ports:
-      - "16686:16686"  # Jaeger UI
-      - "14268:14268"  # Accept jaeger.thrift over HTTP
-      - "6831:6831/udp"  # Accept jaeger.thrift over UDP (agents)
-      - "6832:6832/udp"  # Accept jaeger.thrift over UDP (agents, compact)
-      - "5778:5778"     # Serve configs (sampling strategies, etc.)
+      - "16686:16686"
+      - "14268:14268"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
     environment:
       - COLLECTOR_OTLP_ENABLED=true
       - COLLECTOR_ZIPKIN_HOST_PORT=:9411
@@ -108,10 +102,10 @@ services:
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:
-      - "4317:4317"   # OTLP gRPC receiver
-      - "4318:4318"   # OTLP HTTP receiver
-      - "8888:8888"   # Prometheus metrics
-      - "8889:8889"   # Prometheus exporter metrics
+      - "4317:4317"
+      - "4318:4318"
+      - "8888:8888"
+      - "8889:8889"
     depends_on:
       - jaeger
     restart: unless-stopped
@@ -126,28 +120,21 @@ services:
         USER_ID: ${USER_ID:-1000}
         GROUP_ID: ${GROUP_ID:-1000}
     container_name: fleetpulse-mcp
-    volumes:
-      - ${FLEETPULSE_DATA_PATH:-./data}:/data:ro  # Read-only access to data
     ports:
-      - "8001:8001"  # MCP Server API
+      - "8001:8001"
     restart: unless-stopped
     environment:
-      # FleetPulse backend connection
       - FLEETPULSE_API_URL=http://backend:8000
-      
-      # MCP server settings
       - MCP_PORT=8001
       - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-30.0}
       - MAX_RETRIES=${MAX_RETRIES:-3}
-      
-      # OpenTelemetry configuration
       - OTEL_SERVICE_NAME=fleetpulse-mcp
       - OTEL_SERVICE_VERSION=1.0.0
       - OTEL_ENVIRONMENT=${OTEL_ENVIRONMENT:-development}
       - OTEL_ENABLE_TELEMETRY=${OTEL_ENABLE_TELEMETRY:-true}
       - OTEL_EXPORTER_TYPE=${OTEL_EXPORTER_TYPE:-jaeger}
       - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger:14268/api/traces
-      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_TRACE_SAMPLE_RATE=${OTEL_TRACE_SAMPLE_RATE:-1.0}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
@@ -166,6 +153,5 @@ networks:
   fleetpulse:
     driver: bridge
 
-# Volumes (uncomment when using PostgreSQL)
-# volumes:
-#   postgres-data:
+volumes:
+  postgres-data:

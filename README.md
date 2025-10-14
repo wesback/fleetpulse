@@ -9,13 +9,14 @@ Vibcoding for the win!
 
 ## Features
 
-- 🚀 **FastAPI backend** with SQLite database
+- 🚀 **FastAPI backend** with SQLite or PostgreSQL database support
 - ⚡ **React frontend** with Material UI for a modern look
 - 🤖 **MCP Server**: Model Context Protocol server for AI assistant integration
 - 📦 **Works with any OS**: Includes drop-in Ansible snippets for ArchLinux and Debian/Ubuntu
 - 🐳 **Docker Compose**: One command to launch everything
 - 👀 **Zero-config UI**: Open your browser and see updates at a glance
 - 📊 **OpenTelemetry Observability**: Backend tracing, metrics, and logging
+- 💾 **Flexible Database**: SQLite (default) or PostgreSQL with easy configuration
 
 ---
 
@@ -196,6 +197,70 @@ Uvicorn provides excellent performance for this workload while being simpler to 
 
 
 For more details, see the `docker-compose.yml` and Dockerfiles in the repository.
+
+---
+
+## Database Configuration
+
+FleetPulse supports both **SQLite** (default) and **PostgreSQL** databases with seamless switching via environment variables.
+
+### SQLite (Default)
+SQLite is the default database and requires no configuration:
+
+```bash
+docker compose up -d
+```
+
+**Best for:**
+- Single-node deployments
+- Development and testing
+- Small to medium workloads
+- Zero-configuration setup
+
+### PostgreSQL
+For production deployments and high availability:
+
+```bash
+# Use the PostgreSQL configuration
+docker compose -f docker-compose.postgres.yml up -d
+```
+
+**Best for:**
+- Production environments
+- High availability requirements
+- Distributed deployments
+- Concurrent write-heavy workloads
+
+### Quick Configuration
+Configure database via environment variables in `.env`:
+
+```bash
+# For SQLite (default)
+DATABASE_TYPE=sqlite
+FLEETPULSE_DATA_PATH=./data
+
+# For PostgreSQL
+DATABASE_TYPE=postgresql
+POSTGRES_HOST=postgres
+POSTGRES_DB=fleetpulse
+POSTGRES_USER=fleetpulse
+POSTGRES_PASSWORD=your-secure-password
+```
+
+### Kubernetes/K3s PostgreSQL Setup
+Deploy PostgreSQL in Kubernetes:
+
+```bash
+# Deploy PostgreSQL StatefulSet
+kubectl apply -f k3s-postgres.yaml
+
+# Deploy application with PostgreSQL
+kubectl apply -f k3s-deployment.yaml
+```
+
+📖 **For detailed database configuration, migration guides, and troubleshooting:**
+- **Quick Start Guide**: [DATABASE_QUICKSTART.md](DATABASE_QUICKSTART.md) - Choose the right database in 2 minutes
+- **Complete Guide**: [DATABASE_CONFIGURATION.md](DATABASE_CONFIGURATION.md) - Detailed configuration, migrations, and troubleshooting
 
 ---
 

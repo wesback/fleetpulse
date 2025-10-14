@@ -101,22 +101,14 @@ async def lifespan(app: FastAPI):
             SQLModel.metadata.create_all(engine)
             logger.info("Database tables recreated successfully")
         else:
-            # Check if database exists and has tables
-            db_exists = os.path.exists(db_path) and os.path.getsize(db_path) > 0
+            # Check if tables exist (works for both SQLite and PostgreSQL)
+            inspector = inspect(engine)
+            existing_tables = inspector.get_table_names()
             
-            if db_exists:
-                # Check if our main table exists
-                inspector = inspect(engine)
-                existing_tables = inspector.get_table_names()
-                
-                if "package_updates" in existing_tables:
-                    logger.info("Database tables already exist - skipping creation")
-                else:
-                    logger.info("Database exists but tables missing - creating tables...")
-                    SQLModel.metadata.create_all(engine)
-                    logger.info("Database tables created successfully")
+            if "package_updates" in existing_tables:
+                logger.info("Database tables already exist - skipping creation")
             else:
-                logger.info("New database - creating tables...")
+                logger.info("Creating database tables...")
                 SQLModel.metadata.create_all(engine)
                 logger.info("Database tables created successfully")
         
