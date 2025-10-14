@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from backend.db.session import get_session
 from backend.utils.telemetry import create_business_span, is_telemetry_enabled
+from backend.utils import constants
 
 # Try to import telemetry configuration function directly for health check
 try:
@@ -26,13 +27,17 @@ def health_check(session: Session = Depends(get_session)):
             # Test database connection
             session.exec(select(1)).first()
             
+            # Get database information
+            db_type = constants.DATABASE_TYPE
+            db_info = {"type": db_type, "status": "connected"}
+            
             # Get telemetry configuration
             telemetry_enabled = is_telemetry_enabled()
             if telemetry_enabled and TELEMETRY_CONFIG_AVAILABLE:
                 telemetry_config = get_telemetry_config()
                 health_data = {
                     "status": "healthy", 
-                    "database": "connected",
+                    "database": db_info,
                     "telemetry": {
                         "enabled": telemetry_config.get("enable_telemetry", False),
                         "service_name": telemetry_config.get("service_name", "unknown"),
@@ -45,7 +50,7 @@ def health_check(session: Session = Depends(get_session)):
             else:
                 health_data = {
                     "status": "healthy", 
-                    "database": "connected",
+                    "database": db_info,
                     "telemetry": {
                         "enabled": False,
                         "note": "OpenTelemetry dependencies not installed"
@@ -55,6 +60,7 @@ def health_check(session: Session = Depends(get_session)):
             
             span.set_attribute("health.status", "healthy")
             span.set_attribute("database.status", "connected")
+            span.set_attribute("database.type", db_type)
             span.set_attribute("operation.success", True)
             
             return health_data
