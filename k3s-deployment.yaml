@@ -140,6 +140,40 @@ spec:
         - containerPort: 8000
           name: http
         env:
+        # Database configuration - defaults to SQLite
+        # To use PostgreSQL:
+        # 1. Deploy k3s-postgres.yaml first
+        # 2. Uncomment the DATABASE_TYPE and PostgreSQL configuration below
+        # 3. Comment out FLEETPULSE_DATA_DIR
+        - name: DATABASE_TYPE
+          value: sqlite
+        # - name: DATABASE_TYPE
+        #   value: postgresql
+        # - name: POSTGRES_HOST
+        #   valueFrom:
+        #     configMapKeyRef:
+        #       name: fleetpulse-postgres-config
+        #       key: POSTGRES_HOST
+        # - name: POSTGRES_PORT
+        #   valueFrom:
+        #     configMapKeyRef:
+        #       name: fleetpulse-postgres-config
+        #       key: POSTGRES_PORT
+        # - name: POSTGRES_DB
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: fleetpulse-postgres-secret
+        #       key: POSTGRES_DB
+        # - name: POSTGRES_USER
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: fleetpulse-postgres-secret
+        #       key: POSTGRES_USER
+        # - name: POSTGRES_PASSWORD
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: fleetpulse-postgres-secret
+        #       key: POSTGRES_PASSWORD
         - name: FLEETPULSE_DATA_DIR
           value: /data
         - name: DEPLOYMENT_MODE

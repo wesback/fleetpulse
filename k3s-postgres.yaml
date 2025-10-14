@@ -1,0 +1,124 @@
+---
+# PostgreSQL Secret for credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: fleetpulse-postgres-secret
+  namespace: fleetpulse
+type: Opaque
+stringData:
+  POSTGRES_DB: fleetpulse
+  POSTGRES_USER: fleetpulse
+  POSTGRES_PASSWORD: fleetpulse  # Change this in production!
+---
+# PostgreSQL ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fleetpulse-postgres-config
+  namespace: fleetpulse
+data:
+  POSTGRES_HOST: fleetpulse-postgres
+  POSTGRES_PORT: "5432"
+---
+# PersistentVolumeClaim for PostgreSQL data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fleetpulse-postgres-pvc
+  namespace: fleetpulse
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  # Uncomment and modify if you need a specific storage class
+  # storageClassName: local-path  # K3s default storage class
+---
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: fleetpulse-postgres
+  namespace: fleetpulse
+spec:
+  selector:
+    app: fleetpulse-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP
+---
+# PostgreSQL StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: fleetpulse-postgres
+  namespace: fleetpulse
+spec:
+  serviceName: fleetpulse-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fleetpulse-postgres
+  template:
+    metadata:
+      labels:
+        app: fleetpulse-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: fleetpulse-postgres-secret
+              key: POSTGRES_DB
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: fleetpulse-postgres-secret
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fleetpulse-postgres-secret
+              key: POSTGRES_PASSWORD
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U fleetpulse
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U fleetpulse
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: fleetpulse-postgres-pvc
