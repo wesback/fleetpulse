@@ -258,7 +258,9 @@ kubectl apply -f k3s-postgres.yaml
 kubectl apply -f k3s-deployment.yaml
 ```
 
-📖 **For detailed database configuration, migration guides, and troubleshooting, see [DATABASE_CONFIGURATION.md](DATABASE_CONFIGURATION.md)**
+📖 **For detailed database configuration, migration guides, and troubleshooting:**
+- **Quick Start Guide**: [DATABASE_QUICKSTART.md](DATABASE_QUICKSTART.md) - Choose the right database in 2 minutes
+- **Complete Guide**: [DATABASE_CONFIGURATION.md](DATABASE_CONFIGURATION.md) - Detailed configuration, migrations, and troubleshooting
 
 ---
 
